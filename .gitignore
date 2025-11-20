@@ -1,0 +1,22 @@
+﻿# Byte-code files
+*.pyc
+__pycache__/
+
+# Environments
+.env
+.venv
+env/
+venv/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE specific files (e.g. VS Code, PyCharm)
+.vscode/
+.idea/
+
+# Operating System files
+.DS_Store
+Thumbs.db
