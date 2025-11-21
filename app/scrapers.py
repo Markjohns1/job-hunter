@@ -114,7 +114,7 @@ class BrighterMondayScraper(JobScraper):
                     response = requests.get(url, headers=self.headers, timeout=15)
                     
                     if response.status_code != 200:
-                        print(f"  ⚠️ Status code: {response.status_code}")
+                        print(f" Status code: {response.status_code}")
                         continue
                     
                     soup = BeautifulSoup(response.content, 'html.parser')
@@ -192,7 +192,7 @@ class BrighterMondayScraper(JobScraper):
                                         'posted_date': datetime.utcnow()
                                     }
                                     jobs.append(job_data)
-                                    print(f"  ✅ Found: {title} at {company}")
+                                    print(f" Found: {title} at {company}")
                         
                         except Exception as e:
                             continue
@@ -203,14 +203,14 @@ class BrighterMondayScraper(JobScraper):
                     time.sleep(2)  # Be respectful
                 
                 except Exception as e:
-                    print(f"  ❌ Error with URL: {e}")
+                    print(f"  Error with URL: {e}")
                     continue
             
-            print(f"✅ BrighterMonday: Found {len(jobs)} relevant jobs")
+            print(f"BrighterMonday: Found {len(jobs)} relevant jobs")
             return jobs
         
         except Exception as e:
-            print(f"❌ BrighterMonday scraper error: {e}")
+            print(f"BrighterMonday scraper error: {e}")
             return []
 
 
@@ -267,7 +267,7 @@ class MyJobMagScraper(JobScraper):
                                         'status': 'Found'
                                     }
                                     jobs.append(job_data)
-                                    print(f"  ✅ Found: {title}")
+                                    print(f" Found: {title}")
                         
                         except Exception as e:
                             continue
@@ -275,11 +275,11 @@ class MyJobMagScraper(JobScraper):
                 except Exception as e:
                     continue
             
-            print(f"✅ MyJobMag: Found {len(jobs)} relevant jobs")
+            print(f"MyJobMag: Found {len(jobs)} relevant jobs")
             return jobs
         
         except Exception as e:
-            print(f"❌ MyJobMag error: {e}")
+            print(f"MyJobMag error: {e}")
             return []
 
 
@@ -289,7 +289,7 @@ class RemoteJobScraper(JobScraper):
     def scrape(self):
         """Scrape remote job boards"""
         jobs = []
-        print("\n🔍 Scraping Remote Job Boards...")
+        print("\nScraping Remote Job Boards...")
         
         # We Work Remotely
         try:
@@ -327,13 +327,13 @@ class RemoteJobScraper(JobScraper):
                                     'status': 'Found'
                                 }
                                 jobs.append(job_data)
-                                print(f"  ✅ Remote: {title}")
+                                print(f" Remote: {title}")
                 
                 except Exception as e:
                     continue
             
         except Exception as e:
-            print(f"  ⚠️ WeWorkRemotely error: {e}")
+            print(f" WeWorkRemotely error: {e}")
         
         # RemoteOK
         try:
@@ -371,15 +371,15 @@ class RemoteJobScraper(JobScraper):
                                     'status': 'Found'
                                 }
                                 jobs.append(job_data)
-                                print(f"  ✅ Remote: {title}")
+                                print(f"Remote: {title}")
                 
                 except Exception as e:
                     continue
         
         except Exception as e:
-            print(f"  ⚠️ RemoteOK error: {e}")
+            print(f"RemoteOK error: {e}")
         
-        print(f"✅ Remote Jobs: Found {len(jobs)} relevant jobs")
+        print(f" Remote Jobs: Found {len(jobs)} relevant jobs")
         return jobs
 
 
@@ -437,7 +437,7 @@ class GenericJobScraper(JobScraper):
                 except Exception as e:
                     continue
             
-            print(f"✅ {source_name}: Found {len(jobs)} jobs")
+            print(f"{source_name}: Found {len(jobs)} jobs")
             return jobs
         
         except Exception as e:
@@ -448,7 +448,7 @@ class GenericJobScraper(JobScraper):
 def run_all_scrapers():
     """Run all scrapers and save to database"""
     print("\n" + "="*60)
-    print("🚀 STARTING JOB SCRAPING")
+    print("STARTING JOB SCRAPING")
     print("="*60)
     
     all_jobs = []
@@ -494,7 +494,7 @@ def run_all_scrapers():
             
             if existing:
                 skipped_count += 1
-                print(f"  ⏭️  Skipping duplicate: {job_data['title']}")
+                print(f" Skipping duplicate: {job_data['title']}")
                 continue
             
             # Save new job
@@ -504,14 +504,14 @@ def run_all_scrapers():
             saved_count += 1
             
         except Exception as e:
-            print(f"⚠️ Error saving job '{job_data.get('title', 'Unknown')}': {e}")
+            print(f" Error saving job '{job_data.get('title', 'Unknown')}': {e}")
             db.session.rollback()
             continue
     
     try:
         db.session.commit()
         print(f"\n" + "="*60)
-        print(f"✅ SCRAPING COMPLETE")
+        print(f" SCRAPING COMPLETE")
         print(f"   New jobs saved: {saved_count}")
         print(f"   Duplicates skipped: {skipped_count}")
         print("="*60)
@@ -527,6 +527,6 @@ def run_all_scrapers():
         
     except Exception as e:
         db.session.rollback()
-        print(f"❌ Database error: {e}")
+        print(f" Database error: {e}")
     
     return saved_count

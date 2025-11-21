@@ -1,5 +1,5 @@
 """
-Utility functions for JobHunterPro
+Utility functions for Job Hunter
 """
 
 import os
@@ -125,29 +125,43 @@ def send_telegram_notification(message):
 def export_to_excel(jobs, filename='job_applications.xlsx'):
     """Export jobs to Excel file"""
     import pandas as pd
+    from datetime import datetime
     
-    data = []
-    for job in jobs:
-        data.append({
-            'Title': job.title,
-            'Company': job.company,
-            'Location': job.location,
-            'Status': job.status,
-            'Source': job.source,
-            'Relevance Score': job.relevance_score,
-            'URL': job.url,
-            'Found Date': job.found_date.strftime('%Y-%m-%d') if job.found_date else '',
-            'Applied Date': job.applied_date.strftime('%Y-%m-%d') if job.applied_date else ''
-        })
-    
-    df = pd.DataFrame(data)
-    
-    # Create exports directory if it doesn't exist
-    os.makedirs('exports', exist_ok=True)
-    filepath = os.path.join('exports', filename)
-    
-    df.to_excel(filepath, index=False, engine='openpyxl')
-    return filepath
+    try:
+        data = []
+        for job in jobs:
+            data.append({
+                'Title': job.title,
+                'Company': job.company,
+                'Location': job.location or 'N/A',
+                'Status': job.status,
+                'Source': job.source,
+                'Relevance Score': job.relevance_score,
+                'URL': job.url,
+                'Found Date': job.found_date.strftime('%Y-%m-%d') if job.found_date else '',
+                'Applied Date': job.applied_date.strftime('%Y-%m-%d') if job.applied_date else ''
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Create exports directory in app folder
+        exports_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'exports')
+        os.makedirs(exports_dir, exist_ok=True)
+        
+        # Generate unique filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'job_applications_{timestamp}.xlsx'
+        filepath = os.path.join(exports_dir, filename)
+        
+        # Export to Excel
+        df.to_excel(filepath, index=False, engine='openpyxl')
+        
+        print(f"✅ Exported {len(jobs)} jobs to: {filepath}")
+        return filepath
+        
+    except Exception as e:
+        print(f"❌ Export error: {e}")
+        raise
 
 
 def get_daily_stats():

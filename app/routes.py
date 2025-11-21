@@ -1,7 +1,7 @@
 """
 Flask routes for JobHunterPro
 """
-
+import os
 from flask import Blueprint, render_template, jsonify, request, send_file
 from datetime import datetime
 from app.models import Job, Application, Stats, db
@@ -89,7 +89,7 @@ def scrape_jobs():
         
         # Send notification
         send_telegram_notification(
-            f"🔍 <b>Job Scraping Complete</b>\n\n"
+            f"<b>Job Scraping Complete</b>\n\n"
             f"Found {count} new jobs!\n"
             f"Check your dashboard: http://localhost:5000"
         )
@@ -145,7 +145,7 @@ def apply_to_job(job_id):
         
         # Send notification
         send_telegram_notification(
-            f"✅ <b>Application Sent!</b>\n\n"
+            f"<b>Application Sent!</b>\n\n"
             f"Job: {job.title}\n"
             f"Company: {job.company}\n"
             f"URL: {job.url}"
@@ -219,17 +219,20 @@ def export_jobs():
     
     jobs = query.all()
     
+    if not jobs:
+        return jsonify({'error': 'No jobs to export'}), 404
+    
     try:
-        filename = f"job_applications_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        filepath = export_to_excel(jobs, filename)
+        filepath = export_to_excel(jobs)
         
         return send_file(
             filepath,
             as_attachment=True,
-            download_name=filename,
+            download_name=os.path.basename(filepath),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         )
     except Exception as e:
+        print(f"Export error: {e}")
         return jsonify({'error': str(e)}), 500
 
 

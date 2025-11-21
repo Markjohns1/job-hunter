@@ -1,769 +1,160 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JobHunterPro - Dashboard</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+{% extends "base.html" %}
 
-        :root {
-            --primary: #6366f1;
-            --primary-dark: #4f46e5;
-            --secondary: #8b5cf6;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --dark: #1f2937;
-            --light: #f9fafb;
-            --border: #e5e7eb;
-            --text: #374151;
-            --text-light: #6b7280;
-        }
+{% block title %}JobHunterPro - Dashboard{% endblock %}
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 2rem;
-            color: var(--text);
-        }
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+{% endblock %}
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-
-        /* Header */
-        .header {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logo i {
-            font-size: 2.5rem;
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .logo h1 {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--dark);
-        }
-
-        .header-actions {
-            display: flex;
-            gap: 1rem;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.95rem;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary), var(--secondary));
-            color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
-        }
-
-        .btn-secondary {
-            background: white;
-            color: var(--primary);
-            border: 2px solid var(--primary);
-        }
-
-        .btn-secondary:hover {
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-            transition: transform 0.3s;
-        }
-
-        .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
-        }
-
-        .stat-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .stat-icon {
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-        }
-
-        .stat-icon.blue { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
-        .stat-icon.green { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .stat-icon.orange { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-        .stat-icon.purple { background: rgba(139, 92, 246, 0.1); color: var(--secondary); }
-
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--dark);
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            color: var(--text-light);
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        /* Main Content */
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 2rem;
-        }
-
-        .card {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .card-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--dark);
-        }
-
-        /* Filters */
-        .filters {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .filter-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .filter-group label {
-            font-weight: 600;
-            color: var(--text);
-            font-size: 0.9rem;
-        }
-
-        select, input {
-            padding: 0.5rem 1rem;
-            border: 2px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.95rem;
-            outline: none;
-            transition: border 0.3s;
-        }
-
-        select:focus, input:focus {
-            border-color: var(--primary);
-        }
-
-        /* Table */
-        .table-container {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        thead {
-            background: var(--light);
-        }
-
-        th {
-            padding: 1rem;
-            text-align: left;
-            font-weight: 700;
-            color: var(--dark);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        td {
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
-        }
-
-        tbody tr {
-            transition: background 0.2s;
-        }
-
-        tbody tr:hover {
-            background: var(--light);
-        }
-
-        .job-title {
-            font-weight: 600;
-            color: var(--dark);
-            margin-bottom: 0.25rem;
-        }
-
-        .job-company {
-            color: var(--text-light);
-            font-size: 0.9rem;
-        }
-
-        .badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .badge-found { background: rgba(99, 102, 241, 0.1); color: var(--primary); }
-        .badge-applied { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-        .badge-interview { background: rgba(139, 92, 246, 0.1); color: var(--secondary); }
-        .badge-rejected { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-        .badge-offer { background: rgba(16, 185, 129, 0.2); color: #047857; }
-
-        .relevance-score {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .score-bar {
-            width: 60px;
-            height: 6px;
-            background: var(--border);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .score-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--success));
-            transition: width 0.3s;
-        }
-
-        .action-btns {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .btn-sm {
-            padding: 0.5rem 1rem;
-            font-size: 0.85rem;
-            border-radius: 6px;
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-info {
-            background: var(--primary);
-            color: white;
-        }
-
-        /* Loading */
-        .loading {
-            display: none;
-            text-align: center;
-            padding: 2rem;
-        }
-
-        .loading.active {
-            display: block;
-        }
-
-        .spinner {
-            border: 4px solid var(--border);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 1rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 16px;
-            padding: 2rem;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1.5rem;
-        }
-
-        .modal-title {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        .close-btn {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--text-light);
-        }
-
-        .cover-letter {
-            background: var(--light);
-            padding: 1.5rem;
-            border-radius: 8px;
-            white-space: pre-wrap;
-            line-height: 1.6;
-            font-size: 0.95rem;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                padding: 1rem;
-            }
-
-            .header {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            table {
-                font-size: 0.9rem;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="logo">
-                <i class="fas fa-rocket"></i>
-                <div>
-                    <h1>JobHunterPro</h1>
-                    <p style="color: var(--text-light); font-size: 0.9rem;">Automated Job Application Platform</p>
-                </div>
-            </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" onclick="exportJobs()">
-                    <i class="fas fa-download"></i> Export
-                </button>
-                <button class="btn btn-primary" onclick="scrapeJobs()">
-                    <i class="fas fa-search"></i> Scrape Jobs
-                </button>
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <i class="fas fa-rocket"></i>
+            <div>
+                <h1>JobHunterPro</h1>
+                <p>Automated Job Application Platform</p>
             </div>
         </div>
-
-        <!-- Stats Grid -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon blue">
-                        <i class="fas fa-briefcase"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="stat-total">{{ stats.total_jobs_found }}</div>
-                <div class="stat-label">Total Jobs Found</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon green">
-                        <i class="fas fa-paper-plane"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="stat-applied">{{ stats.jobs_applied }}</div>
-                <div class="stat-label">Applications Sent</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon orange">
-                        <i class="fas fa-clock"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="stat-pending">{{ stats.pending_applications }}</div>
-                <div class="stat-label">Pending Applications</div>
-            </div>
-
-            <div class="stat-card">
-                <div class="stat-header">
-                    <div class="stat-icon purple">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
-                </div>
-                <div class="stat-value" id="stat-response">{{ stats.response_rate }}%</div>
-                <div class="stat-label">Response Rate</div>
-            </div>
-        </div>
-
-        <!-- Main Content -->
-        <div class="main-content">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Job Listings</h2>
-                </div>
-
-                <!-- Filters -->
-                <div class="filters">
-                    <div class="filter-group">
-                        <label>Status:</label>
-                        <select id="filter-status" onchange="filterJobs()">
-                            <option value="all">All</option>
-                            <option value="Found">Found</option>
-                            <option value="Applied">Applied</option>
-                            <option value="Interview">Interview</option>
-                            <option value="Offer">Offer</option>
-                            <option value="Rejected">Rejected</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label>Source:</label>
-                        <select id="filter-source" onchange="filterJobs()">
-                            <option value="all">All Sources</option>
-                            <option value="BrighterMonday">BrighterMonday</option>
-                            <option value="LinkedIn">LinkedIn</option>
-                            <option value="WeWorkRemotely">Remote Jobs</option>
-                        </select>
-                    </div>
-
-                    <div class="filter-group">
-                        <label>Sort By:</label>
-                        <select id="sort-by" onchange="filterJobs()">
-                            <option value="relevance">Relevance</option>
-                            <option value="date">Date</option>
-                            <option value="company">Company</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Loading -->
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p>Loading jobs...</p>
-                </div>
-
-                <!-- Table -->
-                <div class="table-container">
-                    <table id="jobs-table">
-                        <thead>
-                            <tr>
-                                <th>Job Details</th>
-                                <th>Company</th>
-                                <th>Source</th>
-                                <th>Relevance</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="jobs-tbody">
-                            <!-- Jobs will be loaded here -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="exportJobs()">
+                <i class="fas fa-download"></i> Export
+            </button>
+            <button class="btn btn-primary" onclick="scrapeJobs()">
+                <i class="fas fa-search"></i> Scrape Jobs
+            </button>
         </div>
     </div>
 
-    <!-- Modal for Cover Letter -->
-    <div class="modal" id="cover-letter-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">Cover Letter Preview</h3>
-                <button class="close-btn" onclick="closeModal()">&times;</button>
+    <!-- Stats Grid -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon blue">
+                    <i class="fas fa-briefcase"></i>
+                </div>
             </div>
-            <div class="cover-letter" id="cover-letter-text"></div>
-            <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-                <button class="btn btn-primary" onclick="confirmApply()">
-                    <i class="fas fa-paper-plane"></i> Send Application
-                </button>
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <div class="stat-value" id="stat-total">{{ stats.total_jobs_found }}</div>
+            <div class="stat-label">Total Jobs Found</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon green">
+                    <i class="fas fa-paper-plane"></i>
+                </div>
             </div>
+            <div class="stat-value" id="stat-applied">{{ stats.jobs_applied }}</div>
+            <div class="stat-label">Applications Sent</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon orange">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-pending">{{ stats.pending_applications }}</div>
+            <div class="stat-label">Pending Applications</div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-header">
+                <div class="stat-icon purple">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+            <div class="stat-value" id="stat-response">{{ stats.response_rate }}%</div>
+            <div class="stat-label">Response Rate</div>
         </div>
     </div>
 
-    <script>
-        let currentJobId = null;
+    <!-- Main Content -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Job Listings</h2>
+        </div>
 
-        // Load jobs on page load
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('Dashboard loaded, fetching jobs...');
-            loadJobs();
-            loadStats();
-        });
+        <!-- Filters -->
+        <div class="filters">
+            <div class="filter-group">
+                <label>Status:</label>
+                <select id="filter-status" onchange="filterJobs()">
+                    <option value="all">All</option>
+                    <option value="Found">Found</option>
+                    <option value="Applied">Applied</option>
+                    <option value="Interview">Interview</option>
+                    <option value="Offer">Offer</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+            </div>
 
-        async function loadJobs() {
-            const status = document.getElementById('filter-status').value;
-            const source = document.getElementById('filter-source').value;
-            const sort = document.getElementById('sort-by').value;
+            <div class="filter-group">
+                <label>Source:</label>
+                <select id="filter-source" onchange="filterJobs()">
+                    <option value="all">All Sources</option>
+                    <option value="BrighterMonday">BrighterMonday</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="WeWorkRemotely">Remote Jobs</option>
+                </select>
+            </div>
 
-            document.getElementById('loading').classList.add('active');
+            <div class="filter-group">
+                <label>Sort By:</label>
+                <select id="sort-by" onchange="filterJobs()">
+                    <option value="relevance">Relevance</option>
+                    <option value="date">Date</option>
+                    <option value="company">Company</option>
+                </select>
+            </div>
+        </div>
 
-            try {
-                const response = await fetch(`/api/jobs?status=${status}&source=${source}&sort=${sort}`);
-                const data = await response.json();
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading jobs...</p>
+        </div>
 
-                console.log('Jobs loaded:', data);
-                displayJobs(data.jobs);
-            } catch (error) {
-                console.error('Error loading jobs:', error);
-                alert('Error loading jobs. Check console for details.');
-            } finally {
-                document.getElementById('loading').classList.remove('active');
-            }
-        }
-
-        function displayJobs(jobs) {
-            const tbody = document.getElementById('jobs-tbody');
-            tbody.innerHTML = '';
-
-            console.log('Displaying jobs:', jobs.length);
-
-            if (jobs.length === 0) {
-                tbody.innerHTML = `
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-light);">
-                            <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
-                            <h3>No jobs found yet</h3>
-                            <p>Click "Scrape Jobs" to start finding opportunities!</p>
-                        </td>
+                        <th>Job Details</th>
+                        <th>Company</th>
+                        <th>Source</th>
+                        <th>Relevance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
                     </tr>
-                `;
-                return;
-            }
+                </thead>
+                <tbody id="jobs-tbody">
+                    <!-- Jobs loaded by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-            jobs.forEach(job => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>
-                        <div class="job-title">${job.title}</div>
-                        <div class="job-company">${job.location || 'N/A'}</div>
-                    </td>
-                    <td>${job.company}</td>
-                    <td><span class="badge badge-found">${job.source}</span></td>
-                    <td>
-                        <div class="relevance-score">
-                            <span>${Math.round(job.relevance_score)}%</span>
-                            <div class="score-bar">
-                                <div class="score-fill" style="width: ${job.relevance_score}%"></div>
-                            </div>
-                        </div>
-                    </td>
-                    <td><span class="badge badge-${job.status.toLowerCase()}">${job.status}</span></td>
-                    <td>
-                        <div class="action-btns">
-                            ${job.status === 'Found' ? 
-                                `<button class="btn btn-success btn-sm" onclick="applyToJob(${job.id})">
-                                    <i class="fas fa-paper-plane"></i> Apply
-                                </button>` : 
-                                `<button class="btn btn-info btn-sm" onclick="viewDetails(${job.id})">
-                                    <i class="fas fa-eye"></i> View
-                                </button>`
-                            }
-                            <a href="${job.url}" target="_blank" class="btn btn-info btn-sm">
-                                <i class="fas fa-external-link-alt"></i>
-                            </a>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
+<!-- Cover Letter Modal -->
+<div class="modal" id="cover-letter-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Cover Letter Preview</h3>
+            <button class="close-btn" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="cover-letter" id="cover-letter-text"></div>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+            <button class="btn btn-primary" onclick="confirmApply()">
+                <i class="fas fa-paper-plane"></i> Send Application
+            </button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-        function filterJobs() {
-            loadJobs();
-        }
-
-        async function scrapeJobs() {
-            if (!confirm('Start scraping job boards? This may take a few minutes.')) return;
-
-            const btn = event.target.closest('button');
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scraping...';
-
-            try {
-                const response = await fetch('/api/scrape', { method: 'POST' });
-                const data = await response.json();
-
-                if (data.success) {
-                    alert(`Success! Found ${data.jobs_found} new jobs.`);
-                    loadJobs();
-                    loadStats();
-                } else {
-                    alert('Error: ' + data.error);
-                }
-            } catch (error) {
-                alert('Error scraping jobs: ' + error);
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-search"></i> Scrape Jobs';
-            }
-        }
-
-        async function applyToJob(jobId) {
-            currentJobId = jobId;
-
-            try {
-                const response = await fetch(`/api/job/${jobId}`);
-                const data = await response.json();
-
-                // Generate cover letter preview
-                const previewResponse = await fetch(`/api/apply/${jobId}`, { 
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const applyData = await previewResponse.json();
-
-                if (applyData.success) {
-                    document.getElementById('cover-letter-text').textContent = applyData.cover_letter;
-                    document.getElementById('cover-letter-modal').classList.add('active');
-                }
-            } catch (error) {
-                alert('Error: ' + error);
-            }
-        }
-
-        function confirmApply() {
-            alert('Application submitted successfully!');
-            closeModal();
-            loadJobs();
-            loadStats();
-        }
-
-        function closeModal() {
-            document.getElementById('cover-letter-modal').classList.remove('active');
-        }
-
-        async function viewDetails(jobId) {
-            try {
-                const response = await fetch(`/api/job/${jobId}`);
-                const data = await response.json();
-                
-                alert(`Job Details:\n\nTitle: ${data.job.title}\nCompany: ${data.job.company}\n\nClick OK to visit job page.`);
-                window.open(data.job.url, '_blank');
-            } catch (error) {
-                alert('Error loading job details');
-            }
-        }
-
-        async function exportJobs() {
-            window.location.href = '/api/export';
-        }
-
-        async function loadStats() {
-            try {
-                const response = await fetch('/api/stats');
-                const data = await response.json();
-
-                console.log('Stats loaded:', data);
-                
-                document.getElementById('stat-total').textContent = data.stats.total_jobs_found;
-                document.getElementById('stat-applied').textContent = data.stats.jobs_applied;
-                document.getElementById('stat-pending').textContent = data.stats.pending_applications;
-                document.getElementById('stat-response').textContent = data.stats.response_rate + '%';
-            } catch (error) {
-                console.error('Error loading stats:', error);
-            }
-        }
-    </script>
-</body>
-</html>
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
