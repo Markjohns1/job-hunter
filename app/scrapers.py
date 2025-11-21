@@ -1,10 +1,11 @@
 """
-Job board scrapers for JobHunterPro - UPDATED & WORKING
+Job board scrapers for JobHunterPro - FRESH JOBS ONLY
+Focus: Quality over quantity - Fresh, legitimate, applicable jobs
 """
 
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import re
 import hashlib
@@ -12,7 +13,7 @@ from app.models import Job, Stats, db
 from config import Config
 
 class JobScraper:
-    """Base scraper class"""
+    """Base scraper class with quality filters"""
     
     def __init__(self):
         self.headers = {
@@ -24,46 +25,69 @@ class JobScraper:
             'Upgrade-Insecure-Requests': '1'
         }
         self.keywords = Config.KEYWORDS
-        self.locations = Config.LOCATIONS
+        self.max_job_age_days = 14  # Only jobs from last 2 weeks
+    
+    def is_job_fresh(self, posted_date_str):
+        """Check if job was posted recently"""
+        if not posted_date_str:
+            return True  # If no date, assume fresh
+        
+        try:
+            # Parse common date formats
+            posted_date_str = posted_date_str.lower().strip()
+            
+            # Handle relative dates
+            if 'today' in posted_date_str or 'hours ago' in posted_date_str:
+                return True
+            
+            if 'yesterday' in posted_date_str or '1 day ago' in posted_date_str:
+                return True
+            
+            # Extract number of days
+            days_match = re.search(r'(\d+)\s*days?\s*ago', posted_date_str)
+            if days_match:
+                days = int(days_match.group(1))
+                return days <= self.max_job_age_days
+            
+            # Extract weeks
+            weeks_match = re.search(r'(\d+)\s*weeks?\s*ago', posted_date_str)
+            if weeks_match:
+                weeks = int(weeks_match.group(1))
+                return weeks <= 2
+            
+            return True  # Default to fresh if can't parse
+            
+        except Exception as e:
+            return True  # Default to fresh on error
     
     def calculate_relevance(self, job_title, job_description='', company=''):
         """Calculate job relevance score (0-100)"""
         score = 0
         title_lower = job_title.lower()
         desc_lower = (job_description or '').lower()
-        company_lower = (company or '').lower()
         
-        # High priority keywords in title (20 points each)
-        priority_keywords = ['soc', 'security', 'cybersecurity', 'analyst', 'infosec', 'python', 'developer']
+        # High priority keywords in title (25 points each, max 75)
+        priority_keywords = ['soc', 'security', 'cybersecurity', 'analyst', 'python', 'developer', 'engineer']
         for keyword in priority_keywords:
             if keyword in title_lower:
-                score += 20
+                score += 25
         
-        # Medium priority in title (15 points)
-        medium_keywords = ['junior', 'entry', 'associate', 'engineer', 'specialist']
-        for keyword in medium_keywords:
-            if keyword in title_lower:
-                score += 15
+        # Junior/Entry level bonus (20 points)
+        junior_keywords = ['junior', 'entry', 'associate', 'intern', 'graduate']
+        if any(kw in title_lower for kw in junior_keywords):
+            score += 20
         
-        # Keywords in description (5 points each, max 30)
-        desc_score = 0
-        for keyword in self.keywords:
-            if keyword.lower() in desc_lower:
-                desc_score += 5
-        score += min(desc_score, 30)
+        # Tech stack match (5 points each, max 25)
+        tech_stack = ['python', 'javascript', 'react', 'flask', 'fastapi', 'linux', 'sql']
+        for tech in tech_stack:
+            if tech in desc_lower or tech in title_lower:
+                score += 5
         
-        # Positive location indicators (10 points)
-        location_keywords = ['kenya', 'remote', 'nairobi', 'work from home']
-        for loc in location_keywords:
-            if loc in desc_lower or loc in title_lower:
-                score += 10
-                break
-        
-        # Negative keywords (reduce score)
-        negative_keywords = ['senior', '5+ years', '7+ years', '10+ years', 'expert', 'lead', 'principal', 'manager', 'director']
-        for keyword in negative_keywords:
-            if keyword in title_lower or keyword in desc_lower:
-                score -= 20
+        # Negative indicators (heavy penalty)
+        negative = ['senior', '5+ years', '7+ years', '10+ years', 'expert', 'lead', 'principal', 'manager', 'director', 'architect']
+        for neg in negative:
+            if neg in title_lower or neg in desc_lower:
+                score -= 30
         
         return min(max(score, 0), 100)
     
@@ -71,250 +95,334 @@ class JobScraper:
         """Check if job title matches keywords"""
         title_lower = job_title.lower()
         
-        # Check for exact keyword matches
-        for keyword in self.keywords:
-            if keyword.lower() in title_lower:
-                return True
+        # Exclude non-tech jobs immediately
+        exclude_keywords = ['sales', 'marketing', 'accounting', 'finance', 'hr', 'admin', 'receptionist', 'driver']
+        if any(exc in title_lower for exc in exclude_keywords):
+            return False
         
         # Check for tech job indicators
-        tech_indicators = ['developer', 'engineer', 'analyst', 'security', 'software', 'programmer', 'it ', 'tech']
+        tech_indicators = [
+            'developer', 'engineer', 'analyst', 'security', 'software', 
+            'programmer', 'soc', 'cybersecurity', 'devops', 'infosec',
+            'python', 'javascript', 'react', 'full stack', 'backend', 'frontend'
+        ]
         return any(indicator in title_lower for indicator in tech_indicators)
     
     def generate_job_id(self, title, company, url):
-        """Generate unique job ID"""
-        # Create hash from URL (most unique identifier)
+        """Generate unique job ID from URL hash"""
         url_hash = hashlib.md5(url.encode()).hexdigest()[:8]
-        # Clean title and company
         clean_title = re.sub(r'[^a-zA-Z0-9]', '', title)[:30]
         clean_company = re.sub(r'[^a-zA-Z0-9]', '', company)[:20]
         return f"{clean_company}_{clean_title}_{url_hash}"
 
 
 class BrighterMondayScraper(JobScraper):
-    """Scraper for BrighterMonday Kenya - UPDATED"""
+    """Scraper for BrighterMonday Kenya - IMPROVED"""
     
     def scrape(self):
-        """Scrape jobs from BrighterMonday"""
+        """Scrape fresh jobs from BrighterMonday"""
         jobs = []
-        print("\n🔍 Scraping BrighterMonday Kenya...")
+        print("\n🔍 Scraping BrighterMonday Kenya (FRESH JOBS ONLY)...")
         
         try:
-            # Try multiple category URLs
+            # Target specific fresh job URLs
             urls = [
-                "https://www.brightermonday.co.ke/jobs/technology-software",
-                "https://www.brightermonday.co.ke/jobs/it-computer",
-                "https://www.brightermonday.co.ke/jobs?q=developer",
-                "https://www.brightermonday.co.ke/jobs?q=security+analyst",
-                "https://www.brightermonday.co.ke/jobs?q=cybersecurity"
+                "https://www.brightermonday.co.ke/jobs/technology-software?sort=date",
+                "https://www.brightermonday.co.ke/jobs/it-computer?sort=date",
             ]
             
             for url in urls:
                 try:
-                    print(f"  Trying: {url}")
+                    print(f"  Checking: {url}")
                     response = requests.get(url, headers=self.headers, timeout=15)
                     
                     if response.status_code != 200:
-                        print(f" Status code: {response.status_code}")
                         continue
                     
                     soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    # Try multiple selectors (BrighterMonday changes their HTML)
+                    # Multiple selector strategies
                     job_cards = (
-                        soup.find_all('article', class_='search-result') or
-                        soup.find_all('div', class_='job-item') or
-                        soup.find_all('div', class_='search__results__item') or
-                        soup.find_all('div', {'data-job-id': True}) or
-                        soup.find_all('li', class_='search-result') or
-                        soup.select('.search-results article') or
-                        soup.select('[data-testid="job-card"]')
+                        soup.select('article.search-result') or
+                        soup.select('div[data-job-id]') or
+                        soup.select('.job-card') or
+                        soup.select('.search__results__item')
                     )
                     
                     print(f"  Found {len(job_cards)} job cards")
                     
-                    for card in job_cards[:15]:
+                    for card in job_cards[:20]:
                         try:
-                            # Try different selectors for title
+                            # Extract title
                             title_elem = (
-                                card.find('h2') or 
-                                card.find('h3') or
-                                card.find('a', class_='job-title') or
-                                card.find('div', class_='job-title') or
-                                card.select_one('[data-testid="job-title"]') or
-                                card.find('a', href=lambda x: x and '/job/' in x)
-                            )
-                            
-                            # Try different selectors for company
-                            company_elem = (
-                                card.find('span', class_='company') or
-                                card.find('div', class_='company-name') or
-                                card.find('p', class_='company') or
-                                card.select_one('[data-testid="company-name"]')
-                            )
-                            
-                            # Try different selectors for URL
-                            url_elem = (
-                                card.find('a', href=lambda x: x and '/job/' in x) or
-                                card.find('a', href=True)
+                                card.select_one('h2 a') or
+                                card.select_one('.job-title a') or
+                                card.select_one('a[href*="/job/"]')
                             )
                             
                             if not title_elem:
                                 continue
                             
                             title = title_elem.get_text(strip=True)
-                            company = company_elem.get_text(strip=True) if company_elem else 'Company in Kenya'
-                            job_url = url_elem['href'] if url_elem else url
+                            job_url = title_elem.get('href', '')
                             
                             if not job_url.startswith('http'):
                                 job_url = 'https://www.brightermonday.co.ke' + job_url
                             
-                            # Get description if available
-                            desc_elem = card.find('div', class_='description') or card.find('p')
-                            description = desc_elem.get_text(strip=True) if desc_elem else ''
+                            # Extract company
+                            company_elem = (
+                                card.select_one('.company-name') or
+                                card.select_one('[class*="company"]') or
+                                card.select_one('p.company')
+                            )
+                            company = company_elem.get_text(strip=True) if company_elem else 'Kenya Tech Company'
+                            
+                            # Extract date
+                            date_elem = (
+                                card.select_one('.date') or
+                                card.select_one('[class*="date"]') or
+                                card.select_one('time')
+                            )
+                            date_str = date_elem.get_text(strip=True) if date_elem else ''
+                            
+                            # Check if job is fresh
+                            if not self.is_job_fresh(date_str):
+                                print(f" Skipping old job: {title} ({date_str})")
+                                continue
                             
                             # Check relevance
-                            if self.is_relevant(title):
-                                job_id = self.generate_job_id(title, company, job_url)
-                                
-                                # Check if already exists
-                                existing = Job.query.filter_by(job_id=job_id).first()
-                                if not existing:
-                                    job_data = {
-                                        'job_id': job_id,
-                                        'title': title,
-                                        'company': company,
-                                        'url': job_url,
-                                        'description': description[:500],
-                                        'source': 'BrighterMonday',
-                                        'location': 'Kenya',
-                                        'relevance_score': self.calculate_relevance(title, description, company),
-                                        'status': 'Found',
-                                        'posted_date': datetime.utcnow()
-                                    }
-                                    jobs.append(job_data)
-                                    print(f" Found: {title} at {company}")
-                        
+                            if not self.is_relevant(title):
+                                continue
+                            
+                            # Extract description
+                            desc_elem = card.select_one('.description') or card.select_one('p')
+                            description = desc_elem.get_text(strip=True)[:500] if desc_elem else ''
+                            
+                            # Create job
+                            job_id = self.generate_job_id(title, company, job_url)
+                            
+                            # Check if exists
+                            if Job.query.filter_by(job_id=job_id).first():
+                                continue
+                            
+                            job_data = {
+                                'job_id': job_id,
+                                'title': title,
+                                'company': company,
+                                'url': job_url,
+                                'description': description,
+                                'source': 'BrighterMonday',
+                                'location': 'Kenya',
+                                'relevance_score': self.calculate_relevance(title, description, company),
+                                'status': 'Found',
+                                'posted_date': datetime.utcnow()
+                            }
+                            
+                            jobs.append(job_data)
+                            print(f"  {title} at {company} (Posted: {date_str})")
+                            
                         except Exception as e:
                             continue
                     
                     if jobs:
-                        break  # Stop if we found jobs
+                        break  # Got jobs, stop
                     
-                    time.sleep(2)  # Be respectful
+                    time.sleep(2)
                 
                 except Exception as e:
-                    print(f"  Error with URL: {e}")
+                    print(f"   URL error: {e}")
                     continue
             
-            print(f"BrighterMonday: Found {len(jobs)} relevant jobs")
+            print(f"BrighterMonday: {len(jobs)} fresh jobs")
             return jobs
         
         except Exception as e:
-            print(f"BrighterMonday scraper error: {e}")
+            print(f"BrighterMonday error: {e}")
             return []
 
 
-class MyJobMagScraper(JobScraper):
-    """Scraper for MyJobMag Kenya"""
+class FuzuScraper(JobScraper):
+    """Scraper for Fuzu Kenya - Works well!"""
     
     def scrape(self):
-        """Scrape jobs from MyJobMag"""
+        """Scrape jobs from Fuzu"""
         jobs = []
-        print("\n🔍 Scraping MyJobMag Kenya...")
+        print("\n🔍 Scraping Fuzu Kenya...")
         
         try:
-            urls = [
-                "https://www.myjobmag.co.ke/jobs-by-field/information-communication-technology-ict",
-                "https://www.myjobmag.co.ke/jobs-by-field/software-development",
-            ]
+            url = "https://www.fuzu.com/kenya/jobs?q=developer"
+            response = requests.get(url, headers=self.headers, timeout=15)
+            soup = BeautifulSoup(response.content, 'html.parser')
             
-            for url in urls:
+            job_cards = soup.select('.job-item') or soup.select('[data-job]')
+            
+            for card in job_cards[:15]:
+                try:
+                    title_elem = card.select_one('h3 a') or card.select_one('.job-title a')
+                    company_elem = card.select_one('.company-name')
+                    date_elem = card.select_one('.posted-date') or card.select_one('time')
+                    
+                    if not title_elem:
+                        continue
+                    
+                    title = title_elem.get_text(strip=True)
+                    job_url = title_elem.get('href', '')
+                    
+                    if not job_url.startswith('http'):
+                        job_url = 'https://www.fuzu.com' + job_url
+                    
+                    company = company_elem.get_text(strip=True) if company_elem else 'Kenya Company'
+                    date_str = date_elem.get_text(strip=True) if date_elem else ''
+                    
+                    # Check freshness
+                    if not self.is_job_fresh(date_str):
+                        continue
+                    
+                    # Check relevance
+                    if not self.is_relevant(title):
+                        continue
+                    
+                    job_id = self.generate_job_id(title, company, job_url)
+                    
+                    if Job.query.filter_by(job_id=job_id).first():
+                        continue
+                    
+                    job_data = {
+                        'job_id': job_id,
+                        'title': title,
+                        'company': company,
+                        'url': job_url,
+                        'source': 'Fuzu',
+                        'location': 'Kenya',
+                        'relevance_score': self.calculate_relevance(title, '', company),
+                        'status': 'Found'
+                    }
+                    
+                    jobs.append(job_data)
+                    print(f"  {title} at {company}")
+                
+                except Exception as e:
+                    continue
+            
+            print(f"Fuzu: {len(jobs)} fresh jobs")
+            return jobs
+        
+        except Exception as e:
+            print(f"Fuzu error: {e}")
+            return []
+
+
+class IndeedKenyaScraper(JobScraper):
+    """Scraper for Indeed Kenya"""
+    
+    def scrape(self):
+        """Scrape jobs from Indeed Kenya"""
+        jobs = []
+        print("\n🔍 Scraping Indeed Kenya...")
+        
+        try:
+            queries = ['developer', 'cybersecurity', 'software+engineer']
+            
+            for query in queries:
+                url = f"https://ke.indeed.com/jobs?q={query}&l=Kenya&sort=date"
+                
                 try:
                     response = requests.get(url, headers=self.headers, timeout=15)
                     soup = BeautifulSoup(response.content, 'html.parser')
                     
-                    job_cards = soup.find_all('div', class_='job-list-item') or soup.find_all('article')
+                    job_cards = soup.select('.job_seen_beacon') or soup.select('[data-jk]')
                     
                     for card in job_cards[:10]:
                         try:
-                            title_elem = card.find('h2') or card.find('h3') or card.find('a')
-                            company_elem = card.find('span', class_='company') or card.find('p')
-                            url_elem = card.find('a', href=True)
+                            title_elem = card.select_one('h2 a') or card.select_one('.jobTitle')
+                            company_elem = card.select_one('.companyName')
                             
                             if not title_elem:
                                 continue
                             
                             title = title_elem.get_text(strip=True)
-                            company = company_elem.get_text(strip=True) if company_elem else 'Kenya Company'
-                            job_url = url_elem['href'] if url_elem else url
                             
-                            if not job_url.startswith('http'):
-                                job_url = 'https://www.myjobmag.co.ke' + job_url
+                            # Get job URL
+                            job_id_attr = card.get('data-jk', '')
+                            if job_id_attr:
+                                job_url = f"https://ke.indeed.com/viewjob?jk={job_id_attr}"
+                            else:
+                                job_url = title_elem.get('href', '')
+                                if not job_url.startswith('http'):
+                                    job_url = 'https://ke.indeed.com' + job_url
                             
-                            if self.is_relevant(title):
-                                job_id = f"MJM_{company}_{title}".replace(' ', '_')[:200]
-                                
-                                existing = Job.query.filter_by(job_id=job_id).first()
-                                if not existing:
-                                    job_data = {
-                                        'job_id': job_id,
-                                        'title': title,
-                                        'company': company,
-                                        'url': job_url,
-                                        'source': 'MyJobMag',
-                                        'location': 'Kenya',
-                                        'relevance_score': self.calculate_relevance(title, '', company),
-                                        'status': 'Found'
-                                    }
-                                    jobs.append(job_data)
-                                    print(f" Found: {title}")
+                            company = company_elem.get_text(strip=True) if company_elem else 'Kenya Employer'
+                            
+                            # Check relevance
+                            if not self.is_relevant(title):
+                                continue
+                            
+                            job_id = self.generate_job_id(title, company, job_url)
+                            
+                            if Job.query.filter_by(job_id=job_id).first():
+                                continue
+                            
+                            job_data = {
+                                'job_id': job_id,
+                                'title': title,
+                                'company': company,
+                                'url': job_url,
+                                'source': 'Indeed Kenya',
+                                'location': 'Kenya',
+                                'relevance_score': self.calculate_relevance(title, '', company),
+                                'status': 'Found'
+                            }
+                            
+                            jobs.append(job_data)
+                            print(f"  {title} at {company}")
                         
                         except Exception as e:
                             continue
+                    
+                    time.sleep(3)
                 
                 except Exception as e:
                     continue
             
-            print(f"MyJobMag: Found {len(jobs)} relevant jobs")
+            print(f"Indeed: {len(jobs)} fresh jobs")
             return jobs
         
         except Exception as e:
-            print(f"MyJobMag error: {e}")
+            print(f"Indeed error: {e}")
             return []
 
 
 class RemoteJobScraper(JobScraper):
-    """Scraper for remote job boards"""
+    """Scraper for remote job boards - FRESH ONLY"""
     
     def scrape(self):
-        """Scrape remote job boards"""
+        """Scrape remote jobs"""
         jobs = []
-        print("\nScraping Remote Job Boards...")
+        print("\n🔍 Scraping Remote Job Boards...")
         
-        # We Work Remotely
+        # WeWorkRemotely - Usually fresh
         try:
-            url = "https://weworkremotely.com/categories/remote-programming-jobs"
+            url = "https://weworkremotely.com/remote-jobs/search?utf8=%E2%9C%93&term=developer"
             response = requests.get(url, headers=self.headers, timeout=15)
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            job_listings = soup.find_all('li', class_='feature') or soup.find_all('li', {'data-feature-id': True})
+            job_listings = soup.select('li.feature')
             
-            for listing in job_listings[:10]:
+            for listing in job_listings[:8]:
                 try:
-                    title_elem = listing.find('span', class_='title')
-                    company_elem = listing.find('span', class_='company')
-                    url_elem = listing.find('a', href=True)
+                    title_elem = listing.select_one('.title')
+                    company_elem = listing.select_one('.company')
+                    url_elem = listing.select_one('a')
                     
                     if title_elem and url_elem:
                         title = title_elem.get_text(strip=True)
                         company = company_elem.get_text(strip=True) if company_elem else 'Remote Company'
-                        job_url = 'https://weworkremotely.com' + url_elem['href'] if not url_elem['href'].startswith('http') else url_elem['href']
+                        job_url = 'https://weworkremotely.com' + url_elem.get('href', '')
                         
                         if self.is_relevant(title):
-                            job_id = f"WWR_{company}_{title}".replace(' ', '_')[:200]
+                            job_id = self.generate_job_id(title, company, job_url)
                             
-                            existing = Job.query.filter_by(job_id=job_id).first()
-                            if not existing:
+                            if not Job.query.filter_by(job_id=job_id).first():
                                 job_data = {
                                     'job_id': job_id,
                                     'title': title,
@@ -327,135 +435,32 @@ class RemoteJobScraper(JobScraper):
                                     'status': 'Found'
                                 }
                                 jobs.append(job_data)
-                                print(f" Remote: {title}")
-                
-                except Exception as e:
-                    continue
-            
-        except Exception as e:
-            print(f" WeWorkRemotely error: {e}")
-        
-        # RemoteOK
-        try:
-            url = "https://remoteok.com/remote-developer-jobs"
-            response = requests.get(url, headers=self.headers, timeout=15)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            job_rows = soup.find_all('tr', class_='job')
-            
-            for row in job_rows[:10]:
-                try:
-                    title_elem = row.find('h2', itemprop='title')
-                    company_elem = row.find('h3', itemprop='name')
-                    url_elem = row.find('a', itemprop='url')
-                    
-                    if title_elem:
-                        title = title_elem.get_text(strip=True)
-                        company = company_elem.get_text(strip=True) if company_elem else 'Remote Tech Company'
-                        job_url = 'https://remoteok.com' + url_elem['href'] if url_elem and not url_elem['href'].startswith('http') else url
-                        
-                        if self.is_relevant(title):
-                            job_id = f"ROK_{company}_{title}".replace(' ', '_')[:200]
-                            
-                            existing = Job.query.filter_by(job_id=job_id).first()
-                            if not existing:
-                                job_data = {
-                                    'job_id': job_id,
-                                    'title': title,
-                                    'company': company,
-                                    'url': job_url,
-                                    'source': 'RemoteOK',
-                                    'location': 'Remote',
-                                    'job_type': 'Remote',
-                                    'relevance_score': self.calculate_relevance(title, '', company),
-                                    'status': 'Found'
-                                }
-                                jobs.append(job_data)
-                                print(f"Remote: {title}")
+                                print(f"  Remote: {title}")
                 
                 except Exception as e:
                     continue
         
         except Exception as e:
-            print(f"RemoteOK error: {e}")
+            print(f"   WeWorkRemotely error: {e}")
         
-        print(f" Remote Jobs: Found {len(jobs)} relevant jobs")
+        print(f"Remote Jobs: {len(jobs)} fresh jobs")
         return jobs
 
 
-class GenericJobScraper(JobScraper):
-    """Generic scraper for any job board - FALLBACK"""
-    
-    def scrape_url(self, url, source_name):
-        """Generic scraping method"""
-        jobs = []
-        
-        try:
-            print(f"\n🔍 Scraping {source_name}...")
-            response = requests.get(url, headers=self.headers, timeout=15)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Find all links
-            links = soup.find_all('a', href=True)
-            
-            for link in links:
-                try:
-                    text = link.get_text(strip=True)
-                    
-                    # Check if link text looks like a job title
-                    if len(text) > 10 and len(text) < 150 and self.is_relevant(text):
-                        title = text
-                        job_url = link['href']
-                        
-                        if not job_url.startswith('http'):
-                            from urllib.parse import urljoin
-                            job_url = urljoin(url, job_url)
-                        
-                        # Try to find company nearby
-                        parent = link.find_parent()
-                        company = 'Tech Company'
-                        
-                        job_id = f"{source_name}_{title}".replace(' ', '_')[:200]
-                        
-                        existing = Job.query.filter_by(job_id=job_id).first()
-                        if not existing:
-                            job_data = {
-                                'job_id': job_id,
-                                'title': title,
-                                'company': company,
-                                'url': job_url,
-                                'source': source_name,
-                                'location': 'Kenya/Remote',
-                                'relevance_score': self.calculate_relevance(title, '', company),
-                                'status': 'Found'
-                            }
-                            jobs.append(job_data)
-                            
-                            if len(jobs) >= 10:
-                                break
-                
-                except Exception as e:
-                    continue
-            
-            print(f"{source_name}: Found {len(jobs)} jobs")
-            return jobs
-        
-        except Exception as e:
-            print(f"❌ {source_name} error: {e}")
-            return []
-
-
 def run_all_scrapers():
-    """Run all scrapers and save to database"""
+    """Run all scrapers - QUALITY OVER QUANTITY"""
     print("\n" + "="*60)
-    print("STARTING JOB SCRAPING")
+    print("STARTING FRESH JOB SCRAPING")
+    print("Strategy: 5 FRESH JOBS > 100 OLD JOBS")
     print("="*60)
     
     all_jobs = []
     
+    # Run scrapers in priority order
     scrapers = [
         BrighterMondayScraper(),
-        MyJobMagScraper(),
+        FuzuScraper(),
+        IndeedKenyaScraper(),
         RemoteJobScraper(),
     ]
     
@@ -463,60 +468,55 @@ def run_all_scrapers():
         try:
             jobs = scraper.scrape()
             all_jobs.extend(jobs)
-            time.sleep(3)  # Be respectful between scrapers
-        except Exception as e:
-            print(f"❌ Error with scraper {scraper.__class__.__name__}: {e}")
-    
-    # Try generic scraper as fallback
-    if len(all_jobs) < 5:
-        print("\n⚠️ Few jobs found, trying additional sources...")
-        generic = GenericJobScraper()
-        fallback_urls = [
-            ("https://www.fuzu.com/kenya/jobs", "Fuzu"),
-            ("https://ke.linkedin.com/jobs/search?keywords=developer&location=Kenya", "LinkedIn"),
-        ]
+            
+            # Stop if we have enough quality jobs
+            if len(all_jobs) >= 20:
+                print(f"\nGot {len(all_jobs)} quality jobs - stopping")
+                break
+            
+            time.sleep(3)
         
-        for url, name in fallback_urls:
-            try:
-                jobs = generic.scrape_url(url, name)
-                all_jobs.extend(jobs)
-            except:
-                continue
+        except Exception as e:
+            print(f"Scraper error: {e}")
     
-    # Save to database (with duplicate handling)
+    # Filter out low relevance jobs
+    quality_jobs = [job for job in all_jobs if job['relevance_score'] >= 15]
+    
+    print(f"\nQuality Check:")
+    print(f"  Total found: {len(all_jobs)}")
+    print(f"  High quality (15%+): {len(quality_jobs)}")
+    
+    # Save to database
     saved_count = 0
     skipped_count = 0
     
-    for job_data in all_jobs:
+    for job_data in quality_jobs:
         try:
-            # Check if job already exists
             existing = Job.query.filter_by(job_id=job_data['job_id']).first()
             
             if existing:
                 skipped_count += 1
-                print(f" Skipping duplicate: {job_data['title']}")
                 continue
             
-            # Save new job
             job = Job(**job_data)
             db.session.add(job)
-            db.session.flush()  # Flush to catch errors before commit
+            db.session.flush()
             saved_count += 1
             
         except Exception as e:
-            print(f" Error saving job '{job_data.get('title', 'Unknown')}': {e}")
             db.session.rollback()
             continue
     
     try:
         db.session.commit()
         print(f"\n" + "="*60)
-        print(f" SCRAPING COMPLETE")
+        print(f"SCRAPING COMPLETE")
         print(f"   New jobs saved: {saved_count}")
         print(f"   Duplicates skipped: {skipped_count}")
+        print(f"   FRESH, QUALITY jobs ready to apply!")
         print("="*60)
         
-        # Update daily stats
+        # Update stats
         today = datetime.utcnow().date()
         stats = Stats.query.filter_by(date=today).first()
         if not stats:
@@ -527,6 +527,6 @@ def run_all_scrapers():
         
     except Exception as e:
         db.session.rollback()
-        print(f" Database error: {e}")
+        print(f"Database error: {e}")
     
     return saved_count
