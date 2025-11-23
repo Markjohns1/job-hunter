@@ -31,17 +31,15 @@ def get_jobs():
     source = request.args.get('source', 'all')
     sort_by = request.args.get('sort', 'relevance')
     page = request.args.get('page', 1, type=int)
-    per_page = 50  # Increased from 20
+    per_page = 50
     
     query = Job.query
     
-    # Apply filters
     if status != 'all':
         query = query.filter_by(status=status)
     if source != 'all':
         query = query.filter_by(source=source)
     
-    # Apply sorting
     if sort_by == 'relevance':
         query = query.order_by(Job.relevance_score.desc())
     elif sort_by == 'date':
@@ -49,10 +47,9 @@ def get_jobs():
     elif sort_by == 'company':
         query = query.order_by(Job.company)
     
-    # Get all jobs for now (no pagination issues)
     jobs = query.all()
     
-    print(f"API: Returning {len(jobs)} jobs")  # Debug print
+    print(f"API: Returning {len(jobs)} jobs")
     
     return jsonify({
         'jobs': [job.to_dict() for job in jobs],
@@ -90,7 +87,6 @@ def scrape_jobs():
         manager = ScraperManager()
         count = manager.scrape_all()
         
-        # Send notification
         send_telegram_notification(
             f"Job Scraping Complete\n\n"
             f"Found {count} new jobs!\n"
@@ -116,21 +112,52 @@ def scrape_jobs():
 
 @main.route('/api/apply/<int:job_id>', methods=['POST'])
 def apply_to_job(job_id):
-    """Apply to a specific job - generates cover letter and shows modal"""
+    """Apply to a specific job with email support"""
     try:
         job = Job.query.get_or_404(job_id)
+        data = request.get_json() or {}
         
-        # Generate cover letter
         cover_letter = generate_cover_letter(
             job.title, 
             job.company, 
             job.description or ''
         )
         
-        # Return the cover letter for the modal
-        # Don't create application yet - wait for user confirmation
+        send_email = data.get('send_email', False)
+        recipient_email = data.get('recipient_email')
+        
+        if send_email and recipient_email:
+            try:
+                from app.email_service import EmailService
+                email_service = EmailService()
+                
+                cv_path = os.path.join('uploads', 'cv.pdf')
+                
+                email_service.send_application(
+                    to_email=recipient_email,
+                    job_title=job.title,
+                    company=job.company,
+                    cover_letter=cover_letter,
+                    cv_path=cv_path if os.path.exists(cv_path) else None
+                )
+                
+                return jsonify({
+                    'success': True,
+                    'email_sent': True,
+                    'message': 'Application sent via email',
+                    'cover_letter': cover_letter
+                })
+                
+            except Exception as e:
+                print(f"Email error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'Email failed: {str(e)}'
+                }), 500
+        
         return jsonify({
             'success': True,
+            'email_sent': False,
             'cover_letter': cover_letter,
             'job': job.to_dict()
         })
@@ -148,7 +175,7 @@ def apply_to_job(job_id):
 
 @main.route('/api/job/<int:job_id>/status', methods=['PATCH', 'PUT'])
 def update_job_status(job_id):
-    """Update job status - called when user confirms application"""
+    """Update job status"""
     try:
         job = Job.query.get_or_404(job_id)
         data = request.get_json()
@@ -162,15 +189,12 @@ def update_job_status(job_id):
         if new_status:
             job.status = new_status
             
-            # If applying, create application record
             if new_status == 'Applied':
                 if cover_letter:
-                    # Check if application exists
                     if job.application:
                         job.application.cover_letter = cover_letter
                         job.application.applied_date = datetime.utcnow()
                     else:
-                        # Create new application
                         application = Application(
                             job_id=job.id,
                             cover_letter=cover_letter,
@@ -181,11 +205,10 @@ def update_job_status(job_id):
                 
                 job.applied_date = datetime.utcnow()
             
-            # Update stats
             today = datetime.utcnow().date()
             stats = Stats.query.filter_by(date=today).first()
             if not stats:
-                stats = Stats(date=today)
+                stats = Stats(date=today, jobs_found=0)
                 db.session.add(stats)
             
             if new_status == 'Applied':
@@ -199,10 +222,9 @@ def update_job_status(job_id):
             
             db.session.commit()
             
-            # Send notification for applications
             if new_status == 'Applied':
                 send_telegram_notification(
-                    f"✅ <b>Application Sent!</b>\n\n"
+                    f"Application Sent\n\n"
                     f"Job: {job.title}\n"
                     f"Company: {job.company}\n"
                     f"URL: {job.url}"
@@ -310,11 +332,10 @@ def bulk_apply():
     try:
         db.session.commit()
         
-        # Update stats
         today = datetime.utcnow().date()
         stats = Stats.query.filter_by(date=today).first()
         if not stats:
-            stats = Stats(date=today)
+            stats = Stats(date=today, jobs_found=0)
             db.session.add(stats)
         stats.jobs_applied += applied
         db.session.commit()

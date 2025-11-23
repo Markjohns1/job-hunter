@@ -270,7 +270,14 @@ async function applyToJob(jobId) {
     showLoading(true, 'Generating personalized cover letter with AI...');
     
     try {
-        const data = await API.applyToJob(jobId);
+        // Send empty JSON body to get cover letter
+        const response = await fetch(`/api/apply/${jobId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})  // ADD THIS LINE - send empty object
+        });
+        
+        const data = await response.json();
         
         if (data.success) {
             const textarea = document.getElementById('cover-letter-text');
@@ -294,40 +301,90 @@ async function confirmApply() {
     if (!state.currentJobId) return;
     
     const coverLetter = document.getElementById('cover-letter-text')?.value;
+    const recipientEmail = document.getElementById('recipient-email')?.value.trim();
     
     if (!coverLetter || !coverLetter.trim()) {
         showError('Cover letter cannot be empty');
         return;
     }
     
-    showLoading(true, 'Submitting application...');
+    // Determine if we're sending email
+    const sendingEmail = recipientEmail && recipientEmail.length > 0;
     
-    try {
-        const response = await fetch(`/api/job/${state.currentJobId}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                status: 'Applied', 
-                cover_letter: coverLetter 
-            })
-        });
+    if (sendingEmail) {
+        // Send actual email
+        showLoading(true, 'Sending application via email...');
         
-        const data = await response.json();
-        
-        if (data.success) {
-            showSuccess('✓ Application submitted successfully!');
-            closeModal();
-            await loadDashboard();
-        } else {
-            showError(data.error || 'Failed to submit application');
+        try {
+            const response = await fetch(`/api/apply/${state.currentJobId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    send_email: true,
+                    recipient_email: recipientEmail,
+                    cover_letter: coverLetter
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.email_sent) {
+                showSuccess('✓ Application sent via email!');
+                
+                // Now track it in database
+                await fetch(`/api/job/${state.currentJobId}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        status: 'Applied', 
+                        cover_letter: coverLetter 
+                    })
+                });
+                
+                closeModal();
+                await loadDashboard();
+            } else {
+                showError(data.error || 'Failed to send email');
+            }
+        } catch (error) {
+            console.error('Email error:', error);
+            showError('Failed to send email: ' + error.message);
+        } finally {
+            showLoading(false);
         }
-    } catch (error) {
-        console.error('Submit error:', error);
-        showError('Failed to submit application: ' + error.message);
-    } finally {
-        showLoading(false);
+        
+    } else {
+        // Just track application without sending email
+        showLoading(true, 'Tracking application...');
+        
+        try {
+            const response = await fetch(`/api/job/${state.currentJobId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    status: 'Applied', 
+                    cover_letter: coverLetter 
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showSuccess('✓ Application tracked (email not sent)');
+                closeModal();
+                await loadDashboard();
+            } else {
+                showError(data.error || 'Failed to track application');
+            }
+        } catch (error) {
+            console.error('Track error:', error);
+            showError('Failed to track application: ' + error.message);
+        } finally {
+            showLoading(false);
+        }
     }
 }
+
 
 // Delete Job
 async function deleteJob(jobId) {

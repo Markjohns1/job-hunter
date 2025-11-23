@@ -159,14 +159,20 @@
 <div class="modal" id="cover-letter-modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">Review & Edit Cover Letter</h3>
+            <h3 class="modal-title">Review & Send Application</h3>
             <button class="close-btn" onclick="closeModal()">&times;</button>
         </div>
         
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
-                Edit your cover letter below before sending:
-            </label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Recipient Email (Optional)</label>
+            <input type="email" id="recipient-email" placeholder="hr@company.com or leave blank to track only">
+            <small style="color: var(--text-secondary); display: block; margin-top: 4px;">
+                Enter email to send application, or leave blank to just track it
+            </small>
+        </div>
+        
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Cover Letter</label>
             <textarea 
                 id="cover-letter-text" 
                 rows="15" 
@@ -174,20 +180,13 @@
             ></textarea>
         </div>
         
-        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <div style="display: flex; gap: 1rem;">
             <button class="btn btn-success" onclick="confirmApply()" style="flex: 2;">
                 <i class="fas fa-paper-plane"></i> Send Application
             </button>
             <button class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">
                 Cancel
             </button>
-        </div>
-        
-        <div style="margin-top: 1rem; padding: 12px; background: var(--bg-tertiary); border-radius: 6px;">
-            <small style="color: var(--text-secondary);">
-                <i class="fas fa-info-circle"></i> 
-                Tip: Personalize the cover letter with specific details about the company and role
-            </small>
         </div>
     </div>
 </div>
