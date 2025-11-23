@@ -10,7 +10,7 @@ from app.models import Job, Stats, db
 class ScraperManager:
     def __init__(self):
         self.adzuna_app_id = os.getenv('ADZUNA_APP_ID')
-        self.adzuna_app_key = os.getenv('ADZUNA_APP_KEY')
+        self.adzuna_app_key = os.getenv('ADZUNA_API_KEY')
         self.openai_api_key = os.getenv('OPENAI_API_KEY')
     
     def generate_job_id(self, title, company, url):

@@ -198,10 +198,14 @@ Edit `config.py` to update your information:
 ## Deployment
 
 The application is configured to run on Replit with:
-- Port 5000 (webview enabled)
-- Host 0.0.0.0 (allows Replit proxy)
-- PostgreSQL database (auto-configured)
-- Static file serving enabled
+- **Deployment Type**: VM (always-on for scraping and state management)
+- **Port**: 5000 (webview enabled)
+- **Host**: 0.0.0.0 (allows Replit proxy)
+- **Database**: PostgreSQL (auto-configured, auto-initialized on deploy)
+- **Production Server**: Gunicorn with 2 workers
+- **Build Step**: Automatic database schema initialization
+
+The deployment automatically initializes the database schema on first deploy, so no manual migration steps are needed.
 
 ## Security Notes
 
