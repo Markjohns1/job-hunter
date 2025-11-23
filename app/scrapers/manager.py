@@ -10,8 +10,7 @@ from app.models import Job, Stats, db
 class ScraperManager:
     def __init__(self):
         self.adzuna_app_id = os.getenv('ADZUNA_APP_ID')
-        self.adzuna_app_key = os.getenv('ADZUNA_API_KEY')
-        self.openai_api_key = os.getenv('OPENAI_API_KEY')
+        self.adzuna_app_key = os.getenv('ADZUNA_APP_KEY')
     
     def generate_job_id(self, title, company, url):
         """Generate unique job ID"""
@@ -19,7 +18,7 @@ class ScraperManager:
         return hashlib.md5(unique_string.encode()).hexdigest()[:16]
     
     def scrape_all(self):
-        """Run Adzuna scraper and validate with AI"""
+        """Run Adzuna scraper"""
         print("\n" + "="*60)
         print("AUTOMATED JOB SCRAPING")
         print("="*60)
@@ -40,17 +39,6 @@ class ScraperManager:
         
         print(f"\nTotal: {len(all_jobs)} jobs")
         
-        # Validate with AI if available
-        if self.openai_api_key and all_jobs:
-            try:
-                from app.scrapers.ai_validator import AIJobValidator
-                validator = AIJobValidator(self.openai_api_key)
-                all_jobs = validator.batch_validate(all_jobs, max_jobs=20)
-                print(f"After AI: {len(all_jobs)} quality jobs")
-            except Exception as e:
-                print(f"AI validation: {e}")
-        
-        # Save to database
         saved = self.save_jobs(all_jobs)
         
         print("\n" + "="*60)

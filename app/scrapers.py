@@ -13,7 +13,7 @@ from app.models import Job, Stats, db
 from config import Config
 
 class JobScraper:
-    """Base scraper class with quality filters"""
+    """Base scraper class with filters"""
     
     def __init__(self):
         self.headers = {

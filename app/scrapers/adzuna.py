@@ -1,6 +1,6 @@
 """
-Smart Adzuna API Scraper - Searches Multiple Countries
-Automatically finds remote jobs from all supported regions
+Smart Adzuna API Scraper - Kenya & East Africa Focus
+Searches multiple countries with emphasis on Kenya region
 """
 import requests
 import os
@@ -29,6 +29,12 @@ class AdzunaScraper:
         'sg': 'Singapore'
     }
     
+    # Kenya & East Africa priority countries
+    AFRICA_PRIORITY = {
+        'za': 'South Africa',
+        'in': 'India',  # Shared tech market with East Africa
+    }
+    
     def __init__(self, app_id=None, app_key=None):
         self.app_id = app_id or os.getenv('ADZUNA_APP_ID')
         self.app_key = app_key or os.getenv('ADZUNA_API_KEY')
@@ -37,18 +43,18 @@ class AdzunaScraper:
             print("WARNING: Adzuna API credentials not configured!")
             print("Get your free API key at: https://developer.adzuna.com/")
     
-    def scrape(self, keywords=None, max_days_old=7, remote_only=True, max_jobs_per_country=5):
+    def scrape(self, keywords=None, max_days_old=7, remote_only=False, max_jobs_per_country=10):
         """
-        Smart scraper that searches multiple countries
+        Smart scraper focused on Kenya & East Africa
         
         Args:
             keywords: List of job search terms
             max_days_old: Only get jobs posted within this many days
             remote_only: Focus on remote jobs
-            max_jobs_per_country: Limit results per country to avoid duplicates
+            max_jobs_per_country: Limit results per country
         """
         all_jobs = []
-        seen_jobs = set()  # Track unique jobs by title+company
+        seen_jobs = set()
         
         if not self.app_id or not self.app_key:
             print("ERROR: Adzuna API credentials missing")
@@ -56,34 +62,72 @@ class AdzunaScraper:
         
         if not keywords:
             keywords = [
-                "python developer remote",
-                "software engineer remote",
-                "cybersecurity remote",
-                "junior developer remote"
+                # Tech roles
+                "python developer",
+                "software engineer",
+                "junior developer",
+                "cybersecurity analyst",
+                "security analyst",
+                "devops engineer",
+                "data analyst",
+                "network administrator",
+                "it technician",
+                "it support",
+                "backend developer",
+                "full stack developer",
+                # Remote options
+                "remote developer",
+                "work from home tech"
             ]
         
-        print(f"Searching {len(self.SUPPORTED_COUNTRIES)} countries...")
+        print(f"Searching Kenya & East Africa + Global Remote...")
         print("=" * 60)
         
-        # Search each country
-        for country_code, country_name in self.SUPPORTED_COUNTRIES.items():
-            country_jobs = self._search_country(
-                country_code, 
-                country_name, 
-                keywords, 
-                max_days_old,
-                max_jobs_per_country
-            )
+        # Priority: East Africa countries
+        priority_countries = ['za', 'in']
+        
+        for country_code in priority_countries:
+            if country_code in self.SUPPORTED_COUNTRIES:
+                country_name = self.SUPPORTED_COUNTRIES[country_code]
+                country_jobs = self._search_country(
+                    country_code, 
+                    country_name, 
+                    keywords, 
+                    max_days_old,
+                    max_jobs_per_country
+                )
+                
+                for job in country_jobs:
+                    job_key = f"{job['title']}|{job['company']}".lower()
+                    if job_key not in seen_jobs:
+                        seen_jobs.add(job_key)
+                        all_jobs.append(job)
+        
+        # Secondary: Remote jobs from global countries
+        remote_countries = ['us', 'gb', 'ca', 'au', 'de']
+        
+        for country_code in remote_countries:
+            if len(all_jobs) >= 50:  # Stop if we have enough
+                break
             
-            # Add only unique jobs
-            for job in country_jobs:
-                job_key = f"{job['title']}|{job['company']}".lower()
-                if job_key not in seen_jobs:
-                    seen_jobs.add(job_key)
-                    all_jobs.append(job)
+            if country_code in self.SUPPORTED_COUNTRIES:
+                country_name = self.SUPPORTED_COUNTRIES[country_code]
+                country_jobs = self._search_country(
+                    country_code, 
+                    country_name, 
+                    keywords, 
+                    max_days_old,
+                    5  # Fewer jobs from secondary countries
+                )
+                
+                for job in country_jobs:
+                    job_key = f"{job['title']}|{job['company']}".lower()
+                    if job_key not in seen_jobs:
+                        seen_jobs.add(job_key)
+                        all_jobs.append(job)
         
         print("=" * 60)
-        print(f"TOTAL: {len(all_jobs)} unique jobs found across all countries")
+        print(f"TOTAL: {len(all_jobs)} unique jobs found")
         return all_jobs
     
     def _search_country(self, country_code, country_name, keywords, max_days_old, max_results):
@@ -120,7 +164,6 @@ class AdzunaScraper:
                     if len(jobs) >= max_results:
                         break
                     
-                    # Extract and clean job data
                     job_data = {
                         'title': job.get('title', ''),
                         'company': job.get('company', {}).get('display_name', 'Unknown'),
@@ -146,7 +189,6 @@ class AdzunaScraper:
         """Format location nicely"""
         location = job.get('location', {}).get('display_name', '')
         
-        # If remote job, mark it clearly
         if 'remote' in location.lower() or 'anywhere' in location.lower():
             return f"Remote ({country_name})"
         
@@ -157,69 +199,24 @@ class AdzunaScraper:
         if not description:
             return ""
         
-        # Remove HTML tags
         import re
         clean = re.sub('<[^<]+?>', '', description)
-        
-        # Truncate to 1000 chars
         return clean[:1000].strip()
     
-    def search_specific_countries(self, country_codes, keywords=None, max_days_old=7):
+    def search_kenya_focused(self, max_results=30):
         """
-        Search only specific countries
-        
-        Args:
-            country_codes: List like ['us', 'gb', 'ca']
+        Specialized search for Kenya + East Africa
+        Returns jobs most relevant to the region
         """
-        all_jobs = []
+        keywords = [
+            "python developer Kenya",
+            "network administrator Kenya",
+            "it technician Kenya",
+            "data analyst Kenya",
+            "cybersecurity Kenya",
+            "software engineer East Africa",
+            "remote developer Kenya",
+            "junior developer East Africa"
+        ]
         
-        if not keywords:
-            keywords = [
-                "python developer remote",
-                "software engineer remote",
-                "cybersecurity remote"
-            ]
-        
-        for code in country_codes:
-            if code in self.SUPPORTED_COUNTRIES:
-                country_name = self.SUPPORTED_COUNTRIES[code]
-                jobs = self._search_country(code, country_name, keywords, max_days_old, 10)
-                all_jobs.extend(jobs)
-        
-        return all_jobs
-    
-    def get_remote_jobs_only(self, keywords=None, max_days_old=7, total_limit=50):
-        """
-        Get remote jobs that can be done from anywhere
-        Focuses on countries with most remote opportunities
-        """
-        # Countries with most remote jobs
-        priority_countries = ['us', 'gb', 'ca', 'de', 'nl', 'au']
-        
-        if not keywords:
-            keywords = [
-                "remote python developer",
-                "remote software engineer",
-                "remote cybersecurity",
-                "work from home developer",
-                "fully remote engineer"
-            ]
-        
-        print("Searching for remote jobs across top countries...")
-        all_jobs = []
-        
-        for country_code in priority_countries:
-            if len(all_jobs) >= total_limit:
-                break
-            
-            country_name = self.SUPPORTED_COUNTRIES[country_code]
-            jobs = self._search_country(
-                country_code, 
-                country_name, 
-                keywords, 
-                max_days_old,
-                10
-            )
-            all_jobs.extend(jobs)
-        
-        return all_jobs[:total_limit]
+        return self.scrape(keywords=keywords, max_jobs_per_country=max_results)
