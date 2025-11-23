@@ -1,5 +1,5 @@
 """
-JobHunterPro - Professional Job Application Automation Platform
+Job Hunter - Professional Job Application Automation Platform
 Main entry point for the application
 """
 

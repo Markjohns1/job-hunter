@@ -1,5 +1,5 @@
 """
-Database models for JobHunterPro
+Database models for Job Hunter
 """
 
 from datetime import datetime

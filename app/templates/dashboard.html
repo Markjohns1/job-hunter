@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}JobHunterPro - Dashboard{% endblock %}
+{% block title %}Job Hunter - Dashboard{% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
@@ -11,13 +11,15 @@
     <!-- Header -->
     <div class="header">
         <div class="logo">
-            <i class="fas fa-rocket"></i>
             <div>
-                <h1>JobHunterPro</h1>
+                <h1>Job Hunter</h1>
                 <p>Automated Job Application Platform</p>
             </div>
         </div>
         <div class="header-actions">
+            <button class="btn btn-secondary" onclick="openAddJobModal()">
+                <i class="fas fa-plus"></i> Add Job
+            </button>
             <button class="btn btn-secondary" onclick="exportJobs()">
                 <i class="fas fa-download"></i> Export
             </button>
@@ -110,49 +112,140 @@
             </div>
         </div>
 
-        <!-- Loading -->
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Loading jobs...</p>
-        </div>
+      
+ <!-- Table -->
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>
+                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+                </th>
+                <th>Job Details</th>
+                <th>Company</th>
+                <th>Source</th>
+                <th>Relevance</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="jobs-tbody">
+            <!-- Jobs loaded by JavaScript -->
+        </tbody>
+    </table>
+</div>
 
-        <!-- Table -->
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Job Details</th>
-                        <th>Company</th>
-                        <th>Source</th>
-                        <th>Relevance</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="jobs-tbody">
-                    <!-- Jobs loaded by JavaScript -->
-                </tbody>
-            </table>
-        </div>
+<!-- Bulk Actions Bar -->
+<div class="bulk-actions-bar" id="bulk-actions-bar">
+    <span class="selected-count" id="selected-count">0 selected</span>
+    <button class="btn btn-danger" onclick="bulkDeleteJobs()">
+        <i class="fas fa-trash"></i> Delete Selected
+    </button>
+    <button class="btn btn-secondary" onclick="clearSelection()">
+        Clear Selection
+    </button>
+</div>
     </div>
+</div>
+
+<!-- Loading Spinner Overlay -->
+<div id="loading" class="loading">
+
+    <div class="spinner"></div>
+    <p class="loading-text">Loading...</p>
 </div>
 
 <!-- Cover Letter Modal -->
 <div class="modal" id="cover-letter-modal">
     <div class="modal-content">
         <div class="modal-header">
-            <h3 class="modal-title">Cover Letter Preview</h3>
+            <h3 class="modal-title">Review & Edit Cover Letter</h3>
             <button class="close-btn" onclick="closeModal()">&times;</button>
         </div>
-        <div class="cover-letter" id="cover-letter-text"></div>
+        
+        <div style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: var(--text-secondary);">
+                Edit your cover letter below before sending:
+            </label>
+            <textarea 
+                id="cover-letter-text" 
+                rows="15" 
+                style="width: 100%; font-family: inherit; line-height: 1.6;"
+            ></textarea>
+        </div>
+        
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-            <button class="btn btn-primary" onclick="confirmApply()">
+            <button class="btn btn-success" onclick="confirmApply()" style="flex: 2;">
                 <i class="fas fa-paper-plane"></i> Send Application
             </button>
-            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-secondary" onclick="closeModal()" style="flex: 1;">
+                Cancel
+            </button>
+        </div>
+        
+        <div style="margin-top: 1rem; padding: 12px; background: var(--bg-tertiary); border-radius: 6px;">
+            <small style="color: var(--text-secondary);">
+                <i class="fas fa-info-circle"></i> 
+                Tip: Personalize the cover letter with specific details about the company and role
+            </small>
         </div>
     </div>
 </div>
+
+<!-- Add Job Modal -->
+
+<div class="modal" id="add-job-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">Add Job - Quick or Manual</h3>
+            <button class="close-btn" onclick="closeAddJobModal()">&times;</button>
+        </div>
+        <form id="add-job-form" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Job URL *</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="url" id="job-url" required style="flex: 1;">
+                    <button type="button" class="btn btn-primary" onclick="extractJobFromUrl()">
+                        <i class="fas fa-magic"></i> Auto-Fill
+                    </button>
+                </div>
+                <small style="color: var(--text-secondary);">Paste job URL and click Auto-Fill to extract details</small>
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Job Title *</label>
+                <input type="text" id="job-title" required style="width: 100%;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Company *</label>
+                <input type="text" id="job-company" required style="width: 100%;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Location</label>
+                <input type="text" id="job-location" value="Kenya" style="width: 100%;">
+            </div>
+            
+            <div>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Description</label>
+                <textarea id="job-description" rows="4" style="width: 100%;"></textarea>
+            </div>
+            
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button type="submit" class="btn btn-success" style="flex: 1;">
+                    <i class="fas fa-save"></i> Save Job
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeAddJobModal()" style="flex: 1;">
+                    Cancel
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+
 {% endblock %}
 
 {% block extra_js %}

@@ -1,5 +1,5 @@
 """
-Job board scrapers for JobHunterPro - FRESH JOBS ONLY
+Job board scrapers for Job Hunter - FRESH JOBS ONLY
 Focus: Quality over quantity - Fresh, legitimate, applicable jobs
 """
 
@@ -122,7 +122,7 @@ class BrighterMondayScraper(JobScraper):
     def scrape(self):
         """Scrape fresh jobs from BrighterMonday"""
         jobs = []
-        print("\n🔍 Scraping BrighterMonday Kenya (FRESH JOBS ONLY)...")
+        print("\nScraping BrighterMonday Kenya (FRESH JOBS ONLY)...")
         
         try:
             # Target specific fresh job URLs
@@ -247,7 +247,7 @@ class FuzuScraper(JobScraper):
     def scrape(self):
         """Scrape jobs from Fuzu"""
         jobs = []
-        print("\n🔍 Scraping Fuzu Kenya...")
+        print("\nScraping Fuzu Kenya...")
         
         try:
             url = "https://www.fuzu.com/kenya/jobs?q=developer"
@@ -318,7 +318,7 @@ class IndeedKenyaScraper(JobScraper):
     def scrape(self):
         """Scrape jobs from Indeed Kenya"""
         jobs = []
-        print("\n🔍 Scraping Indeed Kenya...")
+        print("\nScraping Indeed Kenya...")
         
         try:
             queries = ['developer', 'cybersecurity', 'software+engineer']
@@ -398,7 +398,7 @@ class RemoteJobScraper(JobScraper):
     def scrape(self):
         """Scrape remote jobs"""
         jobs = []
-        print("\n🔍 Scraping Remote Job Boards...")
+        print("\nScraping Remote Job Boards...")
         
         # WeWorkRemotely - Usually fresh
         try:

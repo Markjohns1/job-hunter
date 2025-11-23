@@ -3,22 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}JobHunterPro{% endblock %}</title>
+    <title>{% block title %}Job Hunter{% endblock %}</title>
     
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    {% block content %}{% endblock %}
-    
-    <!-- Core JavaScript -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <span>Job Hunter</span>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-icon" onclick="scrapeJobs()" title="Scrape Jobs">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="btn-icon" onclick="exportJobs()" title="Export">
+                    <i class="fas fa-download"></i>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
     {% block extra_js %}{% endblock %}
 </body>
 </html>

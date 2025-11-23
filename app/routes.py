@@ -1,11 +1,11 @@
 """
-Flask routes for JobHunterPro
+Flask routes for Job Hunter
 """
+
 import os
 from flask import Blueprint, render_template, jsonify, request, send_file
 from datetime import datetime
 from app.models import Job, Application, Stats, db
-from app.scrapers import run_all_scrapers
 from app.utils import (
     generate_cover_letter, 
     export_to_excel, 
@@ -85,11 +85,14 @@ def get_job_details(job_id):
 def scrape_jobs():
     """Trigger job scraping"""
     try:
-        count = run_all_scrapers()
+        from app.scrapers.manager import ScraperManager
+        
+        manager = ScraperManager()
+        count = manager.scrape_all()
         
         # Send notification
         send_telegram_notification(
-            f"<b>Job Scraping Complete</b>\n\n"
+            f"Job Scraping Complete\n\n"
             f"Found {count} new jobs!\n"
             f"Check your dashboard: http://localhost:5000"
         )
@@ -100,18 +103,23 @@ def scrape_jobs():
             'message': f'Successfully scraped {count} new jobs'
         })
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Scraping error: {error_details}")
+        
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': str(e),
+            'details': error_details
         }), 500
 
 
 @main.route('/api/apply/<int:job_id>', methods=['POST'])
 def apply_to_job(job_id):
-    """Apply to a specific job"""
-    job = Job.query.get_or_404(job_id)
-    
+    """Apply to a specific job - generates cover letter and shows modal"""
     try:
+        job = Job.query.get_or_404(job_id)
+        
         # Generate cover letter
         cover_letter = generate_cover_letter(
             job.title, 
@@ -119,81 +127,110 @@ def apply_to_job(job_id):
             job.description or ''
         )
         
-        # Create application record
-        application = Application(
-            job_id=job.id,
-            cover_letter=cover_letter,
-            applied_date=datetime.utcnow(),
-            email_sent=False  # Will be True when email sending is implemented
-        )
-        
-        # Update job status
-        job.status = 'Applied'
-        job.applied_date = datetime.utcnow()
-        
-        db.session.add(application)
-        db.session.commit()
-        
-        # Update daily stats
-        today = datetime.utcnow().date()
-        stats = Stats.query.filter_by(date=today).first()
-        if not stats:
-            stats = Stats(date=today)
-            db.session.add(stats)
-        stats.jobs_applied += 1
-        db.session.commit()
-        
-        # Send notification
-        send_telegram_notification(
-            f"<b>Application Sent!</b>\n\n"
-            f"Job: {job.title}\n"
-            f"Company: {job.company}\n"
-            f"URL: {job.url}"
-        )
-        
+        # Return the cover letter for the modal
+        # Don't create application yet - wait for user confirmation
         return jsonify({
             'success': True,
-            'message': 'Application submitted successfully',
-            'cover_letter': cover_letter
+            'cover_letter': cover_letter,
+            'job': job.to_dict()
         })
-    
+        
     except Exception as e:
-        db.session.rollback()
+        import traceback
+        error_details = traceback.format_exc()
+        print(f"Apply error: {error_details}")
+        
         return jsonify({
             'success': False,
             'error': str(e)
         }), 500
 
 
-@main.route('/api/job/<int:job_id>/status', methods=['PUT'])
+@main.route('/api/job/<int:job_id>/status', methods=['PATCH', 'PUT'])
 def update_job_status(job_id):
-    """Update job status"""
-    job = Job.query.get_or_404(job_id)
-    data = request.get_json()
+    """Update job status - called when user confirms application"""
+    try:
+        job = Job.query.get_or_404(job_id)
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        new_status = data.get('status')
+        cover_letter = data.get('cover_letter')
+        
+        if new_status:
+            job.status = new_status
+            
+            # If applying, create application record
+            if new_status == 'Applied':
+                if cover_letter:
+                    # Check if application exists
+                    if job.application:
+                        job.application.cover_letter = cover_letter
+                        job.application.applied_date = datetime.utcnow()
+                    else:
+                        # Create new application
+                        application = Application(
+                            job_id=job.id,
+                            cover_letter=cover_letter,
+                            applied_date=datetime.utcnow(),
+                            email_sent=False
+                        )
+                        db.session.add(application)
+                
+                job.applied_date = datetime.utcnow()
+            
+            # Update stats
+            today = datetime.utcnow().date()
+            stats = Stats.query.filter_by(date=today).first()
+            if not stats:
+                stats = Stats(date=today)
+                db.session.add(stats)
+            
+            if new_status == 'Applied':
+                stats.jobs_applied += 1
+            elif new_status == 'Interview':
+                stats.interviews_scheduled += 1
+            elif new_status == 'Rejected':
+                stats.rejections_received += 1
+            elif new_status == 'Offer':
+                stats.offers_received += 1
+            
+            db.session.commit()
+            
+            # Send notification for applications
+            if new_status == 'Applied':
+                send_telegram_notification(
+                    f"✅ <b>Application Sent!</b>\n\n"
+                    f"Job: {job.title}\n"
+                    f"Company: {job.company}\n"
+                    f"URL: {job.url}"
+                )
+            
+            return jsonify({'success': True, 'message': 'Status updated successfully'})
+        
+        return jsonify({'success': False, 'error': 'No status provided'}), 400
     
-    new_status = data.get('status')
-    if new_status:
-        job.status = new_status
-        
-        # Update stats
-        today = datetime.utcnow().date()
-        stats = Stats.query.filter_by(date=today).first()
-        if not stats:
-            stats = Stats(date=today)
-            db.session.add(stats)
-        
-        if new_status == 'Interview':
-            stats.interviews_scheduled += 1
-        elif new_status == 'Rejected':
-            stats.rejections_received += 1
-        elif new_status == 'Offer':
-            stats.offers_received += 1
-        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"Error updating job status: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@main.route('/api/job/<int:job_id>', methods=['DELETE'])
+def delete_job(job_id):
+    """Delete a job"""
+    try:
+        job = Job.query.get_or_404(job_id)
+        db.session.delete(job)
         db.session.commit()
         
         return jsonify({'success': True})
-    
-    return jsonify({'success': False, 'error': 'No status provided'}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @main.route('/api/stats')
@@ -252,12 +289,13 @@ def bulk_apply():
         try:
             job = Job.query.get(job_id)
             if job and job.status == 'Found':
-                cover_letter = generate_cover_letter(job.title, job.company)
+                cover_letter = generate_cover_letter(job.title, job.company, job.description or '')
                 
                 application = Application(
                     job_id=job.id,
                     cover_letter=cover_letter,
-                    applied_date=datetime.utcnow()
+                    applied_date=datetime.utcnow(),
+                    email_sent=False
                 )
                 
                 job.status = 'Applied'

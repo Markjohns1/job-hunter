@@ -1,8 +1,7 @@
 /**
- * JobHunterPro - API Handler
+ * Job Hunter - API Handler
  * Handles all API calls to the Flask backend
  */
-
 const API = {
     /**
      * Fetch all jobs with filters
@@ -69,13 +68,19 @@ const API = {
     /**
      * Update job status
      */
-    async updateJobStatus(jobId, status) {
+    async updateJobStatus(jobId, status, coverLetter = null) {
         try {
+            const body = { status };
+            if (coverLetter) {
+                body.cover_letter = coverLetter;
+            }
+            
             const response = await fetch(`/api/job/${jobId}/status`, {
-                method: 'PUT',
+                method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status })
+                body: JSON.stringify(body)
             });
+            
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             return await response.json();
         } catch (error) {

@@ -1,5 +1,5 @@
 """
-Configuration settings for JobHunterPro
+Configuration settings for Job Hunter
 """
 
 import os
