@@ -8,3 +8,13 @@ openpyxl==3.1.2
 python-dotenv==1.0.0
 lxml==4.9.3
 feedparser==6.0.10
+beautifulsoup4
+feedparser
+Flask
+Flask-Migrate
+Flask-SQLAlchemy
+lxml
+openpyxl
+pandas
+python-dotenv
+requests
