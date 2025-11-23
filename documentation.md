@@ -615,46 +615,82 @@ count = manager.scrape_all()
 ## Email Integration
 
 ### Current Status
-Email sending functionality is implemented but requires configuration.
+Email sending functionality is fully implemented and ready to use.
+
+### Features
+- Professional HTML and plain text email formatting
+- Automatic CV attachment support
+- Uses candidate profile from config.py
+- Retry logic with fallback to SSL (port 465)
+- Connection testing capability
+- Detailed error reporting
 
 ### Recommended Setup: Brevo
 
 #### Advantages
 - 300 emails/day free tier
 - Better deliverability than Gmail
-- Simple REST API
+- SMTP authentication supported
 - No 2FA complications
 - Professional sending infrastructure
 
 #### Configuration
 1. Sign up at https://www.brevo.com/
-2. Generate API key
-3. Set environment variables:
+2. Generate SMTP credentials
+3. Set environment variables in Replit Secrets:
    ```
    MAIL_SERVER=smtp-relay.brevo.com
    MAIL_PORT=587
    MAIL_USERNAME=your-email@example.com
-   MAIL_PASSWORD=your-brevo-api-key
+   MAIL_PASSWORD=your-brevo-smtp-key
    ```
 
-### Email Service Module
+### Alternative: Gmail
 
-Located in `app/email_service.py` (requires completion):
+If using Gmail (not recommended for high volume):
+1. Enable 2-Factor Authentication
+2. Generate App Password at https://myaccount.google.com/apppasswords
+3. Set environment variables:
+   ```
+   MAIL_SERVER=smtp.gmail.com
+   MAIL_PORT=587
+   MAIL_USERNAME=your-gmail@gmail.com
+   MAIL_PASSWORD=your-app-password
+   ```
 
-**Expected Functionality**:
-- Send application emails with cover letter
-- Attach CV (from uploads/ folder)
-- Professional email formatting
-- Error handling and retry logic
-- Rate limiting to prevent spam flags
+### Usage
 
-**To Complete**:
-1. Implement EmailService class
-2. Add SMTP connection handling
-3. Create email templates
-4. Add attachment support
-5. Implement retry logic
-6. Add logging
+#### Sending Applications
+The email service is automatically called when you click "Apply" on a job and provide an email address.
+
+**API Call Example**:
+```javascript
+fetch('/api/apply/123', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+        send_email: true,
+        recipient_email: 'hr@company.com'
+    })
+})
+```
+
+#### Testing Connection
+```python
+from app.email_service import EmailService
+
+service = EmailService()
+success, message = service.test_connection()
+print(f"Connection: {message}")
+```
+
+#### Email Content
+Each email includes:
+- Professional HTML formatting with company branding
+- Full cover letter text
+- Your contact information with clickable links
+- Attached CV (if available in uploads/ folder)
+- Plain text fallback for email clients without HTML support
 
 ---
 
