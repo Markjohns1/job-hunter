@@ -31,6 +31,7 @@ class Job(db.Model):
     
     # Relationships
     application = db.relationship('Application', backref='job', uselist=False, cascade='all, delete-orphan')
+    auto_apply_logs = db.relationship('AutoApplyLog', backref='job', cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<Job {self.title} at {self.company}>'
@@ -117,4 +118,100 @@ class Stats(db.Model):
             'interviews': self.interviews_scheduled,
             'rejections': self.rejections_received,
             'offers': self.offers_received
+        }
+
+
+class AutoApplySettings(db.Model):
+    """User's auto-apply preferences"""
+    __tablename__ = 'auto_apply_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Enable/disable auto-apply
+    enabled = db.Column(db.Boolean, default=False)
+    
+    # Filters (comma-separated)
+    job_titles = db.Column(db.Text)  # "Python Developer, Network Admin, Data Analyst"
+    locations = db.Column(db.Text)   # "Kenya, Remote, East Africa"
+    job_types = db.Column(db.Text)   # "Full-time, Contract, Remote"
+    
+    # Settings
+    max_applications_per_day = db.Column(db.Integer, default=5)
+    auto_apply_time = db.Column(db.String(5), default='09:00')  # HH:MM format
+    
+    # Tracking
+    total_auto_applied = db.Column(db.Integer, default=0)
+    last_run = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<AutoApplySettings enabled={self.enabled}>'
+    
+    def get_job_titles_list(self):
+        """Parse comma-separated job titles"""
+        if not self.job_titles:
+            return []
+        return [title.strip() for title in self.job_titles.split(',')]
+    
+    def get_locations_list(self):
+        """Parse comma-separated locations"""
+        if not self.locations:
+            return []
+        return [loc.strip() for loc in self.locations.split(',')]
+    
+    def get_job_types_list(self):
+        """Parse comma-separated job types"""
+        if not self.job_types:
+            return []
+        return [jtype.strip() for jtype in self.job_types.split(',')]
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'enabled': self.enabled,
+            'job_titles': self.get_job_titles_list(),
+            'locations': self.get_locations_list(),
+            'job_types': self.get_job_types_list(),
+            'max_applications_per_day': self.max_applications_per_day,
+            'auto_apply_time': self.auto_apply_time,
+            'total_auto_applied': self.total_auto_applied,
+            'last_run': self.last_run.strftime('%Y-%m-%d %H:%M') if self.last_run else None
+        }
+
+
+class AutoApplyLog(db.Model):
+    """Track each auto-apply action"""
+    __tablename__ = 'auto_apply_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('jobs.id'), nullable=False)
+    
+    # Action taken
+    action = db.Column(db.String(50))  # "auto_applied", "manual_apply_needed", "skipped"
+    reason = db.Column(db.Text)  # Why skipped or action details
+    
+    # Email info
+    recruiter_email = db.Column(db.String(200))
+    email_sent = db.Column(db.Boolean, default=False)
+    
+    # Telegram notification
+    telegram_sent = db.Column(db.Boolean, default=False)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<AutoApplyLog job_id={self.job_id} action={self.action}>'
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'job_id': self.job_id,
+            'action': self.action,
+            'reason': self.reason,
+            'recruiter_email': self.recruiter_email,
+            'email_sent': self.email_sent,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M')
         }

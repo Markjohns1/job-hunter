@@ -370,6 +370,207 @@ td:last-child .btn {
     gap: 8px;
     flex-wrap: wrap;
 }
+/* Auto-Apply Settings page */
+
+.settings-container {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 24px;
+    margin-top: 20px;
+}
+
+.settings-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.settings-panel h3 {
+    margin-bottom: 16px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: var(--bg-tertiary);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.toggle-switch.active {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.toggle-switch span {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.3s;
+}
+
+.toggle-switch.active span {
+    left: 22px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-group textarea {
+    resize: vertical;
+    font-family: inherit;
+}
+
+.logs-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.logs-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logs-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.logs-table {
+    width: 100%;
+    border-collapse: collapse;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.logs-table thead {
+    background: var(--bg-tertiary);
+    position: sticky;
+    top: 0;
+}
+
+.logs-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+    border-bottom: 1px solid var(--border);
+}
+
+.logs-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.logs-table tbody tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.action-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.action-badge.auto_applied {
+    background: rgba(49, 162, 76, 0.2);
+    color: var(--success);
+}
+
+.action-badge.manual_apply_needed {
+    background: rgba(225, 135, 23, 0.2);
+    color: #e1871f;
+}
+
+.action-badge.skipped {
+    background: rgba(176, 179, 184, 0.2);
+    color: var(--text-secondary);
+}
+
+.button-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+}
+
+.status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-dot.active {
+    background: var(--success);
+}
+
+.status-dot.inactive {
+    background: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .settings-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .logs-table {
+        max-height: 400px;
+    }
+}
 
 /* Badge */
 .badge {

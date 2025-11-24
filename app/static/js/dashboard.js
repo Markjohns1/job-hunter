@@ -1,20 +1,17 @@
-// Job Hunter Dashboard - Enhanced JavaScript
-// State Management
 const state = {
     currentJobId: null,
     selectedJobs: new Set(),
     currentFilters: { status: 'all', source: 'all', sort: 'relevance' },
-    jobs: []
+    jobs: [],
+    abortController: null
 };
 
-// Initialize on DOM load
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Dashboard initializing...');
     initializeDashboard();
     setupEventListeners();
 });
 
-// Initialize Dashboard
 async function initializeDashboard() {
     try {
         await loadDashboard();
@@ -24,15 +21,12 @@ async function initializeDashboard() {
     }
 }
 
-// Setup all event listeners
 function setupEventListeners() {
-    // Form submission
     const addJobForm = document.getElementById('add-job-form');
     if (addJobForm) {
         addJobForm.addEventListener('submit', handleAddJobSubmit);
     }
 
-    // Modal close on outside click
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
         modal.addEventListener('click', (e) => {
@@ -42,26 +36,21 @@ function setupEventListeners() {
         });
     });
 
-    // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyboardShortcuts);
 }
 
-// Keyboard shortcuts handler
 function handleKeyboardShortcuts(e) {
-    // ESC to close modals
     if (e.key === 'Escape') {
         closeModal();
         closeAddJobModal();
     }
     
-    // Ctrl/Cmd + K to open add job modal
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         openAddJobModal();
     }
 }
 
-// Load Dashboard Data
 async function loadDashboard() {
     await Promise.all([
         loadJobs(state.currentFilters),
@@ -69,33 +58,34 @@ async function loadDashboard() {
     ]);
 }
 
-// Load Jobs with Filters
 async function loadJobs(filters = {}) {
     console.log('Loading jobs with filters:', filters);
+    
+    if (state.abortController) {
+        state.abortController.abort();
+    }
+    state.abortController = new AbortController();
+    
     showLoading(true, 'Loading jobs...');
     
     try {
         const data = await API.getJobs(filters);
         console.log('Jobs loaded:', data);
         
-        if (data && data.jobs) {
-            state.jobs = data.jobs;
-            displayJobs(data.jobs);
-        } else {
-            console.error('Invalid data format:', data);
-            showError('Invalid response format');
+        const jobsList = Array.isArray(data?.jobs) ? data.jobs : [];
+        state.jobs = jobsList;
+        displayJobs(jobsList);
+    } catch (error) {
+        if (error.name !== 'AbortError') {
+            console.error('Failed to load jobs:', error);
+            showError('Failed to load jobs: ' + error.message);
             displayJobs([]);
         }
-    } catch (error) {
-        console.error('Failed to load jobs:', error);
-        showError('Failed to load jobs: ' + error.message);
-        displayJobs([]);
     } finally {
         showLoading(false);
     }
 }
 
-// Display Jobs in Table
 function displayJobs(jobs) {
     console.log('Displaying jobs:', jobs.length);
     const tbody = document.getElementById('jobs-tbody') || document.querySelector('tbody');
@@ -111,10 +101,10 @@ function displayJobs(jobs) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="7" style="text-align: center; padding: 3rem;">
-                    <div style="color: var(--text-secondary); justify-content: center; align-items: center;">
-                        <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 1rem; opacity: 0.5;"></i>
-                        <h3 style="margin-bottom: 0.5rem;">No jobs found</h3>
-                        <p>Click "Scrape Jobs" to find fresh opportunities or add jobs manually</p>
+                    <div style="color: var(--text-secondary); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1rem;">
+                        <i class="fas fa-inbox" style="font-size: 48px; opacity: 0.5;"></i>
+                        <h3 style="margin: 0;">No jobs found</h3>
+                        <p style="margin: 0;">Click "Scrape Jobs" to find fresh opportunities or add jobs manually</p>
                     </div>
                 </td>
             </tr>
@@ -126,20 +116,15 @@ function displayJobs(jobs) {
         const row = createJobRow(job);
         tbody.appendChild(row);
     });
-    
-    console.log('Jobs displayed successfully');
 }
 
-// Create Job Row
 function createJobRow(job) {
     const row = document.createElement('tr');
-    const statusClass = job.status ? job.status.toLowerCase() : 'found';
     const relevanceScore = job.relevance_score ? Math.round(job.relevance_score) : 0;
     
-    // Determine relevance color
-    let relevanceColor = '#e4163a'; // red
-    if (relevanceScore >= 70) relevanceColor = '#31a24c'; // green
-    else if (relevanceScore >= 40) relevanceColor = '#f59e0b'; // orange
+    let relevanceColor = '#e4163a';
+    if (relevanceScore >= 70) relevanceColor = '#31a24c';
+    else if (relevanceScore >= 40) relevanceColor = '#f59e0b';
     
     row.innerHTML = `
         <td style="text-align: center;">
@@ -172,21 +157,21 @@ function createJobRow(job) {
             </div>
         </td>
         <td>
-            <span class="status status-${statusClass}" style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: ${getStatusColor(job.status).bg}; color: ${getStatusColor(job.status).text};">
+            <span class="status" style="display: inline-block; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: ${getStatusColor(job.status).bg}; color: ${getStatusColor(job.status).text};">
                 ${escapeHtml(job.status || 'Found')}
             </span>
         </td>
         <td>
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
                 ${job.status === 'Found' ? `
-                    <button onclick="applyToJob(${job.id})" class="btn btn-sm btn-primary" title="Apply to this job">
+                    <button onclick="applyToJob(${job.id})" class="btn btn-sm btn-primary">
                         <i class="fas fa-paper-plane"></i> Apply
                     </button>
                 ` : ''}
-                <a href="${escapeHtml(job.url || '#')}" target="_blank" class="btn btn-sm btn-secondary" title="Open job posting">
+                <a href="${escapeHtml(job.url || '#')}" target="_blank" class="btn btn-sm btn-secondary">
                     <i class="fas fa-external-link-alt"></i> Open
                 </a>
-                <button onclick="deleteJob(${job.id})" class="btn btn-sm btn-danger" title="Delete job">
+                <button onclick="deleteJob(${job.id})" class="btn btn-sm btn-danger">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -196,7 +181,6 @@ function createJobRow(job) {
     return row;
 }
 
-// Get status colors
 function getStatusColor(status) {
     const colors = {
         'found': { bg: 'rgba(35, 116, 225, 0.2)', text: '#2374e1' },
@@ -208,13 +192,9 @@ function getStatusColor(status) {
     return colors[status?.toLowerCase()] || colors.found;
 }
 
-// Load Statistics
 async function loadStats() {
-    console.log('Loading stats...');
     try {
         const data = await API.getStats();
-        console.log('Stats loaded:', data);
-        
         if (data && data.stats) {
             updateStatDisplay('stat-total', data.stats.total_jobs_found || 0);
             updateStatDisplay('stat-applied', data.stats.jobs_applied || 0);
@@ -226,56 +206,47 @@ async function loadStats() {
     }
 }
 
-// Animate stat value update
 function updateStatDisplay(elementId, value) {
     const element = document.getElementById(elementId);
     if (element) {
         element.style.transition = 'transform 0.2s';
         element.style.transform = 'scale(1.1)';
         element.textContent = value;
-        setTimeout(() => {
-            element.style.transform = 'scale(1)';
-        }, 200);
+        setTimeout(() => { element.style.transform = 'scale(1)'; }, 200);
     }
 }
 
-// Scrape Jobs
 async function scrapeJobs() {
-    if (!confirm('Start scraping fresh jobs from job boards? This may take a few minutes.')) return;
-    
+    if (!confirm('Start scraping fresh jobs? This may take a few minutes.')) return;
     showLoading(true, 'Scraping jobs from multiple sources...');
     
     try {
         const data = await API.scrapeJobs();
-        console.log('Scrape result:', data);
-        
         if (data.success) {
-            showSuccess(`✓ Found ${data.jobs_found} new jobs!`);
+            showSuccess('Found ' + data.jobs_found + ' new jobs!');
             await loadDashboard();
         } else {
             showError(data.error || 'Scraping failed');
         }
     } catch (error) {
-        console.error('Scraping error:', error);
         showError('Scraping failed: ' + error.message);
     } finally {
         showLoading(false);
     }
 }
 
-// Apply to Job
 async function applyToJob(jobId) {
     state.currentJobId = jobId;
-    
     showLoading(true, 'Generating personalized cover letter with AI...');
     
     try {
-        // Send empty JSON body to get cover letter
         const response = await fetch(`/api/apply/${jobId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})  // ADD THIS LINE - send empty object
+            body: JSON.stringify({})
         });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const data = await response.json();
         
@@ -289,14 +260,12 @@ async function applyToJob(jobId) {
             showError(data.error || 'Failed to generate cover letter');
         }
     } catch (error) {
-        console.error('Apply error:', error);
         showError('Failed to generate cover letter: ' + error.message);
     } finally {
         showLoading(false);
     }
 }
 
-// Confirm Application
 async function confirmApply() {
     if (!state.currentJobId) return;
     
@@ -308,13 +277,10 @@ async function confirmApply() {
         return;
     }
     
-    // Determine if we're sending email
     const sendingEmail = recipientEmail && recipientEmail.length > 0;
     
     if (sendingEmail) {
-        // Send actual email
         showLoading(true, 'Sending application via email...');
-        
         try {
             const response = await fetch(`/api/apply/${state.currentJobId}`, {
                 method: 'POST',
@@ -326,58 +292,30 @@ async function confirmApply() {
                 })
             });
             
-            const data = await response.json();
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             
+            const data = await response.json();
             if (data.success && data.email_sent) {
-                showSuccess('✓ Application sent via email!');
-                
-                // Now track it in database
-                await fetch(`/api/job/${state.currentJobId}/status`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        status: 'Applied', 
-                        cover_letter: coverLetter 
-                    })
-                });
-                
+                showSuccess('Application sent via email!');
+                await updateJobStatus(state.currentJobId, 'Applied', coverLetter);
                 closeModal();
                 await loadDashboard();
             } else {
                 showError(data.error || 'Failed to send email');
             }
         } catch (error) {
-            console.error('Email error:', error);
             showError('Failed to send email: ' + error.message);
         } finally {
             showLoading(false);
         }
-        
     } else {
-        // Just track application without sending email
         showLoading(true, 'Tracking application...');
-        
         try {
-            const response = await fetch(`/api/job/${state.currentJobId}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    status: 'Applied', 
-                    cover_letter: coverLetter 
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess('✓ Application tracked (email not sent)');
-                closeModal();
-                await loadDashboard();
-            } else {
-                showError(data.error || 'Failed to track application');
-            }
+            await updateJobStatus(state.currentJobId, 'Applied', coverLetter);
+            showSuccess('Application tracked');
+            closeModal();
+            await loadDashboard();
         } catch (error) {
-            console.error('Track error:', error);
             showError('Failed to track application: ' + error.message);
         } finally {
             showLoading(false);
@@ -385,43 +323,50 @@ async function confirmApply() {
     }
 }
 
-
-// Delete Job
-async function deleteJob(jobId) {
-    if (!confirm('Are you sure you want to delete this job? This action cannot be undone.')) return;
+async function updateJobStatus(jobId, status, coverLetter) {
+    const response = await fetch(`/api/job/${jobId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, cover_letter: coverLetter })
+    });
     
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    return await response.json();
+}
+
+async function deleteJob(jobId) {
+    if (!confirm('Delete this job?')) return;
     showLoading(true, 'Deleting job...');
     
     try {
         const response = await fetch(`/api/job/${jobId}`, { method: 'DELETE' });
+        
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
         const data = await response.json();
         
-        if (response.ok && data.success) {
-            showSuccess('✓ Job deleted');
+        if (data.success) {
+            showSuccess('Job deleted');
             state.selectedJobs.delete(jobId);
             await loadDashboard();
         } else {
             showError(data.error || 'Delete failed');
         }
     } catch (error) {
-        console.error('Delete error:', error);
         showError('Delete failed: ' + error.message);
     } finally {
         showLoading(false);
     }
 }
 
-// Filter Jobs
 function filterJobs() {
     const status = document.getElementById('filter-status')?.value || 'all';
     const source = document.getElementById('filter-source')?.value || 'all';
     const sort = document.getElementById('sort-by')?.value || 'relevance';
-    
     state.currentFilters = { status, source, sort };
     loadJobs(state.currentFilters);
 }
 
-// Checkbox Handling
 function handleCheckboxChange(jobId, checked) {
     if (checked) {
         state.selectedJobs.add(jobId);
@@ -432,7 +377,6 @@ function handleCheckboxChange(jobId, checked) {
     updateSelectAllCheckbox();
 }
 
-// Toggle Select All
 function toggleSelectAll(checked) {
     const checkboxes = document.querySelectorAll('.job-checkbox');
     checkboxes.forEach(checkbox => {
@@ -447,7 +391,6 @@ function toggleSelectAll(checked) {
     updateBulkActionsBar();
 }
 
-// Update Select All Checkbox
 function updateSelectAllCheckbox() {
     const selectAllCheckbox = document.getElementById('select-all');
     const allCheckboxes = document.querySelectorAll('.job-checkbox');
@@ -459,7 +402,6 @@ function updateSelectAllCheckbox() {
     }
 }
 
-// Update Bulk Actions Bar
 function updateBulkActionsBar() {
     const bar = document.getElementById('bulk-actions-bar');
     const count = document.getElementById('selected-count');
@@ -467,54 +409,46 @@ function updateBulkActionsBar() {
     if (bar && count) {
         if (state.selectedJobs.size > 0) {
             bar.classList.add('active');
-            count.textContent = `${state.selectedJobs.size} job${state.selectedJobs.size > 1 ? 's' : ''} selected`;
+            count.textContent = state.selectedJobs.size + ' job' + (state.selectedJobs.size > 1 ? 's' : '') + ' selected';
         } else {
             bar.classList.remove('active');
         }
     }
 }
 
-// Bulk Delete Jobs
 async function bulkDeleteJobs() {
     if (state.selectedJobs.size === 0) return;
+    if (!confirm('Delete ' + state.selectedJobs.size + ' jobs?')) return;
     
-    if (!confirm(`Delete ${state.selectedJobs.size} selected job${state.selectedJobs.size > 1 ? 's' : ''}? This action cannot be undone.`)) return;
-    
-    showLoading(true, `Deleting ${state.selectedJobs.size} jobs...`);
-    
+    showLoading(true, 'Deleting jobs...');
     try {
         const deletePromises = Array.from(state.selectedJobs).map(jobId =>
             fetch(`/api/job/${jobId}`, { method: 'DELETE' })
+                .then(res => res.json())
+                .catch(err => ({ success: false, error: err.message }))
         );
-        
         await Promise.all(deletePromises);
-        showSuccess(`✓ ${state.selectedJobs.size} job${state.selectedJobs.size > 1 ? 's' : ''} deleted successfully`);
+        showSuccess(state.selectedJobs.size + ' job(s) deleted');
         clearSelection();
         await loadDashboard();
     } catch (error) {
-        console.error('Bulk delete error:', error);
         showError('Failed to delete some jobs');
     } finally {
         showLoading(false);
     }
 }
 
-// Clear Selection
 function clearSelection() {
     state.selectedJobs.clear();
-    const checkboxes = document.querySelectorAll('.job-checkbox');
-    checkboxes.forEach(checkbox => checkbox.checked = false);
-    
+    document.querySelectorAll('.job-checkbox').forEach(cb => cb.checked = false);
     const selectAllCheckbox = document.getElementById('select-all');
     if (selectAllCheckbox) {
         selectAllCheckbox.checked = false;
         selectAllCheckbox.indeterminate = false;
     }
-    
     updateBulkActionsBar();
 }
 
-// Modal Functions
 function openAddJobModal() {
     document.getElementById('add-job-modal')?.classList.add('active');
     document.getElementById('job-url')?.focus();
@@ -530,7 +464,6 @@ function closeModal() {
     state.currentJobId = null;
 }
 
-// Extract Job from URL
 async function extractJobFromUrl() {
     const urlInput = document.getElementById('job-url');
     const url = urlInput?.value;
@@ -541,8 +474,7 @@ async function extractJobFromUrl() {
         return;
     }
     
-    showLoading(true, 'Extracting job details from URL...');
-    
+    showLoading(true, 'Extracting job details...');
     try {
         const response = await fetch('/api/extract-job', {
             method: 'POST',
@@ -550,26 +482,25 @@ async function extractJobFromUrl() {
             body: JSON.stringify({ url: url.trim() })
         });
         
-        const data = await response.json();
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
+        const data = await response.json();
         if (data.success && data.job) {
             document.getElementById('job-title').value = data.job.title || '';
             document.getElementById('job-company').value = data.job.company || '';
             document.getElementById('job-location').value = data.job.location || 'Kenya';
             document.getElementById('job-description').value = data.job.description || '';
-            showSuccess('✓ Job details extracted! Review and save.');
+            showSuccess('Job details extracted!');
         } else {
             showError('Could not extract job details. Please fill manually.');
         }
     } catch (error) {
-        console.error('Extract error:', error);
         showError('Extraction failed. Please fill manually.');
     } finally {
         showLoading(false);
     }
 }
 
-// Handle Add Job Form Submission
 async function handleAddJobSubmit(e) {
     e.preventDefault();
     
@@ -582,14 +513,12 @@ async function handleAddJobSubmit(e) {
         source: 'Manual'
     };
     
-    // Validation
     if (!jobData.title || !jobData.company || !jobData.url) {
-        showError('Please fill in all required fields (Title, Company, URL)');
+        showError('Please fill in all required fields');
         return;
     }
     
     showLoading(true, 'Adding job...');
-    
     try {
         const response = await fetch('/api/job', {
             method: 'POST',
@@ -597,24 +526,23 @@ async function handleAddJobSubmit(e) {
             body: JSON.stringify(jobData)
         });
         
-        const data = await response.json();
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
+        const data = await response.json();
         if (data.success) {
-            showSuccess('✓ Job added successfully');
+            showSuccess('Job added successfully');
             closeAddJobModal();
             await loadDashboard();
         } else {
             showError(data.error || 'Failed to add job');
         }
     } catch (error) {
-        console.error('Add job error:', error);
         showError('Failed to add job: ' + error.message);
     } finally {
         showLoading(false);
     }
 }
 
-// Export Jobs
 function exportJobs() {
     if (typeof API !== 'undefined' && API.exportJobs) {
         API.exportJobs();
@@ -623,18 +551,17 @@ function exportJobs() {
     }
 }
 
-// UI Helper Functions
-function showLoading(show, message = 'Loading...') {
+function showLoading(show, message) {
     const loading = document.getElementById('loading');
     if (!loading) return;
     if (show) {
-        loading.querySelector('.loading-text').textContent = message;
+        const text = loading.querySelector('.loading-text');
+        if (text) text.textContent = message || 'Loading...';
         loading.classList.add('active');
     } else {
         loading.classList.remove('active');
     }
 }
-
 
 function showSuccess(message) {
     console.log('Success:', message);
@@ -646,8 +573,7 @@ function showError(message) {
     showNotification(message, 'error');
 }
 
-function showNotification(message, type = 'info') {
-    // Simple notification - can be replaced with a better notification system
+function showNotification(message, type) {
     const notification = document.createElement('div');
     notification.style.cssText = `
         position: fixed;
@@ -663,7 +589,6 @@ function showNotification(message, type = 'info') {
         animation: slideIn 0.3s ease;
     `;
     notification.textContent = message;
-    
     document.body.appendChild(notification);
     
     setTimeout(() => {
@@ -679,7 +604,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Add animation keyframes
 const style = document.createElement('style');
 style.textContent = `
     @keyframes slideIn {

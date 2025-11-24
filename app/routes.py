@@ -5,7 +5,7 @@ Flask routes for Job Hunter
 import os
 from flask import Blueprint, render_template, jsonify, request, send_file
 from datetime import datetime
-from app.models import Job, Application, Stats, db
+from app.models import Job, Application, Stats, AutoApplySettings, AutoApplyLog, db
 from app.utils import (
     generate_cover_letter, 
     export_to_excel, 
@@ -348,4 +348,167 @@ def bulk_apply():
     
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+#  AUTO-APPLY ROUTES 
+@main.route('/auto-apply')
+def auto_apply_page():
+    return render_template('auto_apply.html')
+    
+@main.route('/api/auto-apply/settings', methods=['GET'])
+def get_auto_apply_settings():
+    """Get current auto-apply settings"""
+    settings = AutoApplySettings.query.first()
+    
+    if not settings:
+        settings = AutoApplySettings()
+        db.session.add(settings)
+        db.session.commit()
+    
+    return jsonify(settings.to_dict())
+
+
+@main.route('/api/auto-apply/settings', methods=['POST', 'PUT'])
+def update_auto_apply_settings():
+    """Update auto-apply settings"""
+    data = request.get_json()
+    
+    settings = AutoApplySettings.query.first()
+    if not settings:
+        settings = AutoApplySettings()
+        db.session.add(settings)
+    
+    if 'enabled' in data:
+        settings.enabled = data['enabled']
+    if 'job_titles' in data:
+        settings.job_titles = ','.join(data['job_titles']) if isinstance(data['job_titles'], list) else data['job_titles']
+    if 'locations' in data:
+        settings.locations = ','.join(data['locations']) if isinstance(data['locations'], list) else data['locations']
+    if 'job_types' in data:
+        settings.job_types = ','.join(data['job_types']) if isinstance(data['job_types'], list) else data['job_types']
+    if 'max_applications_per_day' in data:
+        settings.max_applications_per_day = data['max_applications_per_day']
+    if 'auto_apply_time' in data:
+        settings.auto_apply_time = data['auto_apply_time']
+    
+    db.session.commit()
+    
+    send_telegram_notification(
+        f" Auto-Apply Settings Updated\n\n"
+        f"Status: {'Enabled' if settings.enabled else 'Disabled'}\n"
+        f"Max/Day: {settings.max_applications_per_day}"
+    )
+    
+    return jsonify({
+        'success': True,
+        'settings': settings.to_dict()
+    })
+
+
+@main.route('/api/auto-apply/run', methods=['POST'])
+def run_auto_apply():
+    """Manually trigger auto-apply"""
+    try:
+        from app.auto_apply import AutoApplyManager
+        
+        manager = AutoApplyManager()
+        count = manager.run_daily_auto_apply()
+        
+        return jsonify({
+            'success': True,
+            'applied': count,
+            'message': f'Auto-applied to {count} jobs'
+        })
+    except Exception as e:
+        print(f"Auto-apply error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@main.route('/api/auto-apply/logs', methods=['GET'])
+def get_auto_apply_logs():
+    """Get auto-apply logs"""
+    limit = request.args.get('limit', 50, type=int)
+    logs = AutoApplyLog.query.order_by(AutoApplyLog.created_at.desc()).limit(limit).all()
+    
+    return jsonify({
+        'logs': [log.to_dict() for log in logs],
+        'total': len(logs)
+    })
+
+
+@main.route('/api/job/<int:job_id>/submit-email', methods=['POST'])
+def submit_job_email(job_id):
+    """User submits recruiter email for manual application"""
+    try:
+        job = Job.query.get_or_404(job_id)
+        data = request.get_json()
+        recruiter_email = data.get('recruiter_email', '').strip()
+        
+        if not recruiter_email:
+            return jsonify({'success': False, 'error': 'Email required'}), 400
+        
+        if not job.application:
+            return jsonify({'success': False, 'error': 'No application record found'}), 400
+        
+        cover_letter = job.application.cover_letter
+        
+        try:
+            from app.email_service import EmailService
+            email_service = EmailService()
+            
+            cv_path = os.path.join('uploads', 'cv.pdf')
+            
+            email_service.send_application(
+                to_email=recruiter_email,
+                job_title=job.title,
+                company=job.company,
+                cover_letter=cover_letter,
+                cv_path=cv_path if os.path.exists(cv_path) else None
+            )
+            
+            job.status = 'Applied'
+            job.applied_date = datetime.utcnow()
+            job.application.email_sent = True
+            
+            log = AutoApplyLog(
+                job_id=job.id,
+                action='auto_applied',
+                reason='User-submitted email, sent via auto-apply',
+                recruiter_email=recruiter_email,
+                email_sent=True,
+                telegram_sent=True
+            )
+            db.session.add(log)
+            
+            today = datetime.utcnow().date()
+            stats = Stats.query.filter_by(date=today).first()
+            if not stats:
+                stats = Stats(date=today)
+                db.session.add(stats)
+            stats.jobs_applied += 1
+            
+            db.session.commit()
+            
+            send_telegram_notification(
+                f" Application Sent!\n\n"
+                f"Job: {job.title}\n"
+                f"Company: {job.company}\n"
+                f"To: {recruiter_email}\n\n"
+                f"Good luck! "
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Application sent successfully',
+                'job': job.to_dict()
+            })
+        
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Email failed: {str(e)}'}), 500
+    
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

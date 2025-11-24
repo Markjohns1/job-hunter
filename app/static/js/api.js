@@ -19,7 +19,6 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Get single job details
      */
@@ -33,7 +32,6 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Trigger job scraping
      */
@@ -47,7 +45,6 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Apply to a job
      */
@@ -64,7 +61,6 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Update job status
      */
@@ -88,7 +84,6 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Get dashboard statistics
      */
@@ -102,14 +97,12 @@ const API = {
             throw error;
         }
     },
-
     /**
      * Export jobs to Excel
      */
     async exportJobs(status = 'all') {
         window.location.href = `/api/export?status=${status}`;
     },
-
     /**
      * Bulk apply to multiple jobs
      */

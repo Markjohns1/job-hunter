@@ -112,45 +112,43 @@
             </div>
         </div>
 
-      
- <!-- Table -->
-<div class="table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>
-                    <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
-                </th>
-                <th>Job Details</th>
-                <th>Company</th>
-                <th>Source</th>
-                <th>Relevance</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody id="jobs-tbody">
-            <!-- Jobs loaded by JavaScript -->
-        </tbody>
-    </table>
-</div>
+        <!-- Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>
+                            <input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)">
+                        </th>
+                        <th>Job Details</th>
+                        <th>Company</th>
+                        <th>Source</th>
+                        <th>Relevance</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="jobs-tbody">
+                    <!-- Jobs loaded by JavaScript -->
+                </tbody>
+            </table>
+        </div>
 
-<!-- Bulk Actions Bar -->
-<div class="bulk-actions-bar" id="bulk-actions-bar">
-    <span class="selected-count" id="selected-count">0 selected</span>
-    <button class="btn btn-danger" onclick="bulkDeleteJobs()">
-        <i class="fas fa-trash"></i> Delete Selected
-    </button>
-    <button class="btn btn-secondary" onclick="clearSelection()">
-        Clear Selection
-    </button>
-</div>
+        <!-- Bulk Actions Bar -->
+        <div class="bulk-actions-bar" id="bulk-actions-bar">
+            <span class="selected-count" id="selected-count">0 selected</span>
+            <button class="btn btn-danger" onclick="bulkDeleteJobs()">
+                <i class="fas fa-trash"></i> Delete Selected
+            </button>
+            <button class="btn btn-secondary" onclick="clearSelection()">
+                Clear Selection
+            </button>
+        </div>
     </div>
 </div>
 
 <!-- Loading Spinner Overlay -->
 <div id="loading" class="loading">
-
     <div class="spinner"></div>
     <p class="loading-text">Loading...</p>
 </div>
@@ -192,7 +190,6 @@
 </div>
 
 <!-- Add Job Modal -->
-
 <div class="modal" id="add-job-modal">
     <div class="modal-content">
         <div class="modal-header">
@@ -243,10 +240,9 @@
     </div>
 </div>
 
-
-
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

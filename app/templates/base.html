@@ -17,6 +17,12 @@
                 <span>Job Hunter</span>
             </div>
             <div class="nav-actions">
+                <a href="/" class="btn-icon" title="Dashboard">
+                    <i class="fas fa-home"></i>
+                </a>
+                <a href="/auto-apply" class="btn-icon" title="Auto-Apply">
+                    <i class="fas fa-cog"></i>
+                </a>
                 <button class="btn-icon" onclick="scrapeJobs()" title="Scrape Jobs">
                     <i class="fas fa-sync-alt"></i>
                 </button>
@@ -26,13 +32,9 @@
             </div>
         </div>
     </nav>
-
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
-
-    <script src="{{ url_for('static', filename='js/api.js') }}"></script>
-    
     {% block extra_js %}{% endblock %}
 </body>
 </html>
