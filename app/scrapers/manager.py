@@ -1,9 +1,9 @@
 """
-Scraper Manager - Clean automated job scraping
+Scraper Manager - Clean automated job scraping from multiple sources
 """
-
 import os
 import hashlib
+import requests
 from datetime import datetime
 from app.models import Job, Stats, db
 
@@ -18,37 +18,124 @@ class ScraperManager:
         return hashlib.md5(unique_string.encode()).hexdigest()[:16]
     
     def scrape_all(self):
-        """Run Adzuna scraper"""
+        """Run all scrapers - Adzuna + RemoteOK"""
         print("\n" + "="*60)
-        print("AUTOMATED JOB SCRAPING")
+        print("AUTOMATED JOB SCRAPING - Multiple Sources")
         print("="*60)
         
         all_jobs = []
         
-        # Get fresh jobs from Adzuna
         if self.adzuna_app_id and self.adzuna_app_key:
             try:
                 from app.scrapers.adzuna import AdzunaScraper
                 scraper = AdzunaScraper(self.adzuna_app_id, self.adzuna_app_key)
-                jobs = scraper.scrape()
-                all_jobs.extend(jobs)
+                adzuna_jobs = scraper.scrape()
+                all_jobs.extend(adzuna_jobs)
+                print(f"✓ Adzuna: {len(adzuna_jobs)} jobs")
             except Exception as e:
-                print(f"Adzuna error: {e}")
+                print(f"✗ Adzuna error: {e}")
         else:
-            print("Adzuna API not configured")
+            print("✗ Adzuna API not configured")
         
-        print(f"\nTotal: {len(all_jobs)} jobs")
+        try:
+            remoteok_jobs = self._scrape_remoteok()
+            all_jobs.extend(remoteok_jobs)
+            print(f"✓ RemoteOK: {len(remoteok_jobs)} jobs")
+        except Exception as e:
+            print(f"✗ RemoteOK error: {e}")
+        
+        print(f"\nTotal scraped: {len(all_jobs)} jobs")
         
         saved = self.save_jobs(all_jobs)
         
-        print("\n" + "="*60)
-        print(f"SAVED: {saved} new jobs")
         print("="*60)
+        print(f"Saved: {saved} new jobs to database")
+        print("="*60 + "\n")
         
         return saved
     
+    def _scrape_remoteok(self, keywords=None):
+        """Scrape RemoteOK for remote jobs"""
+        jobs = []
+        seen = set()
+        
+        if not keywords:
+            keywords = [
+                "python", "developer", "engineer", "data",
+                "junior", "full stack", "backend", "devops", "security",
+                "software", "tech", "programmer", "analyst",
+                "flask", "data recording", "it support", "network",
+                "administrator", "technician", "cybersecurity", "database",
+                "frontend", "api", "cloud", "linux", "windows",
+                "helpdesk", "infrastructure", "support", "it"
+            ]
+        
+        try:
+            response = requests.get(
+                "https://remoteok.com/api",
+                timeout=15,
+                headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+                params={'limit': 500}
+            )
+            
+            if response.status_code != 200:
+                print(f"RemoteOK HTTP {response.status_code}")
+                return jobs
+            
+            if not response.text:
+                print("RemoteOK returned empty response")
+                return jobs
+            
+            all_remoteok_jobs = response.json()
+            if not isinstance(all_remoteok_jobs, list):
+                print(f"RemoteOK response is not a list: {type(all_remoteok_jobs)}")
+                return jobs
+            
+            print(f"RemoteOK API returned {len(all_remoteok_jobs)} total jobs")
+            
+            for i, job in enumerate(all_remoteok_jobs[:50]):
+                if len(jobs) >= 30:
+                    break
+                
+                title = job.get('title', '').lower()
+                company = job.get('company', '').lower()
+                
+                matches_keyword = any(kw.lower() in title or kw.lower() in company for kw in keywords)
+                
+                if matches_keyword and title.strip():  # Only if title exists
+                    job_key = f"{job.get('title')}|{job.get('company')}".lower()
+                    
+                    if job_key not in seen:
+                        seen.add(job_key)
+                        
+                        job_data = {
+                            'title': job.get('title', 'Unknown').strip(),
+                            'company': job.get('company', 'Unknown').strip(),
+                            'location': job.get('location', 'Remote'),
+                            'url': job.get('url') or job.get('apply_url', ''),
+                            'description': job.get('description', '')[:500],
+                            'source': 'RemoteOK',
+                            'relevance_score': 65,
+                            'contract_type': 'Remote',
+                            'salary_min': None
+                        }
+                        
+                        jobs.append(job_data)
+                        print(f"  RemoteOK: {job.get('title')}")
+            
+            print(f"RemoteOK: Saved {len(jobs)} jobs")
+        
+        except requests.Timeout:
+            print("RemoteOK timeout")
+        except requests.ConnectionError:
+            print("RemoteOK connection error")
+        except Exception as e:
+            print(f"RemoteOK error: {type(e).__name__}: {e}")
+        
+        return jobs
+    
     def save_jobs(self, jobs):
-        """Save jobs to database"""
+        """Save jobs to database, avoiding duplicates"""
         saved_count = 0
         
         for job_data in jobs:
@@ -78,7 +165,7 @@ class ScraperManager:
                 
                 db.session.add(job)
                 saved_count += 1
-                
+            
             except Exception as e:
                 print(f"Save error: {e}")
                 continue
@@ -86,7 +173,6 @@ class ScraperManager:
         try:
             db.session.commit()
             
-            # Update stats
             today = datetime.utcnow().date()
             stats = Stats.query.filter_by(date=today).first()
             if not stats:
@@ -94,7 +180,7 @@ class ScraperManager:
                 db.session.add(stats)
             stats.jobs_found += saved_count
             db.session.commit()
-            
+        
         except Exception as e:
             db.session.rollback()
             print(f"Database error: {e}")
