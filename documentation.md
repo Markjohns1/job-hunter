@@ -621,7 +621,7 @@ Email sending functionality is fully implemented and ready to use.
 - Professional HTML and plain text email formatting
 - Automatic CV attachment support
 - Uses candidate profile from config.py
-- Retry logic with fallback to SSL (port 465)
+- Retry logic with fallback to SSL (port 587)
 - Connection testing capability
 - Detailed error reporting
 

@@ -146,7 +146,7 @@ This application was sent via Job Hunter"""
             errors.append(f"Port {self.smtp_port} failed: {e}")
         
         try:
-            server = smtplib.SMTP_SSL(self.smtp_server, 465, timeout=15)
+            server = smtplib.SMTP_SSL(self.smtp_server, 587, timeout=15)
             server.set_debuglevel(0)
             server.login(self.username, self.password)
             server.send_message(msg)
@@ -154,7 +154,7 @@ This application was sent via Job Hunter"""
             print(f"Email sent successfully via SSL to {msg['To']}")
             return True
         except Exception as e:
-            errors.append(f"Port 465 SSL failed: {e}")
+            errors.append(f"Port 587 SSL failed: {e}")
         
         error_msg = " | ".join(errors)
         print(f"All email sending attempts failed: {error_msg}")
